@@ -304,6 +304,138 @@ body.light #pending-search-input { background:#FAF8F1; }
   .glass-panel { backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); }
 }
 @media (prefers-reduced-motion:reduce) { .p-card,.cal-cell,.glass-panel { transition:none !important; } .p-card:hover,.cal-cell:hover { transform:none; } }
+
+/* ===== iPhone 移动端修复 ===== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 1. 修复顶部导航栏 */
+@media (max-width: 1023px) {
+  .main-area {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mobile-top-nav {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mobile-top-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-top-nav > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    writing-mode: horizontal-tb !important;
+  }
+
+  .mobile-top-nav > .nav-item {
+    display: inline-flex;
+    width: auto;
+    min-width: max-content;
+  }
+
+  .mobile-top-nav svg {
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0;
+  }
+}
+
+/* 2. 修复待投递搜索框 */
+.pending-search-container {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 16px;
+}
+
+.pending-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 限制放大镜尺寸 */
+.pending-search-wrapper > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  max-width: 18px;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+/* 搜索输入框 */
+#pending-search-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 10px 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(30,41,59,.65);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+body.light #pending-search-input {
+  background: #FAF8F1;
+}
+
+#pending-search-input:focus {
+  border-color: #356B3F;
+  box-shadow: 0 0 0 3px rgba(53,107,63,.13);
+}
+
+/* 清除按钮 */
+#clear-pending-search {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+#clear-pending-search[hidden] {
+  display: none !important;
+}
+
+/* 3. 优化移动端毛玻璃性能 */
+@media (max-width: 1023px) {
+  .glass-panel {
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+  }
+}
+
 </style>
 </head>
 <body class="font-sans antialiased">
