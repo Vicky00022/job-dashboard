@@ -1,1 +1,2055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投递追踪仪表盘</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23356B3F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8'/%3E%3Cpath d='M14 7h7v7'/%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://fastly.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+    :root {
+        --bg: #17213c; --panel: rgba(40,57,90,0.66); --line: rgba(148,163,184,0.2);
+        --text: #f8fafc; --muted: #94a3b8;
+        --blue: #60a5fa; --amber: #fbbf24; --cyan: #22d3ee; --violet: #a78bfa; --emerald: #34d399; --slate: #94a3b8;
+    }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+        background:
+            radial-gradient(1100px 560px at 12% -8%, rgba(96,165,250,0.16), transparent 62%),
+            radial-gradient(900px 520px at 108% 18%, rgba(167,139,250,0.13), transparent 58%),
+            radial-gradient(700px 420px at 50% 118%, rgba(34,211,238,0.07), transparent 60%),
+            linear-gradient(168deg, #1d2c50 0%, #182340 48%, #131b32 100%);
+        background-attachment: fixed;
+        color: var(--text);
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    .glass-panel { background: var(--panel); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+    .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+    .st { display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:9999px; font-size:12px; line-height:18px; font-weight:500; white-space:nowrap; border:1px solid transparent; }
+    .st::before { content:""; width:6px; height:6px; border-radius:9999px; background:currentColor; }
+    .st-blue { color:#7FB3A0; background:rgba(127,179,160,0.13); border-color:rgba(127,179,160,0.32); }
+    .st-amber { color:#A8C686; background:rgba(168,198,134,0.13); border-color:rgba(168,198,134,0.32); }
+    .st-cyan { color:#5FC7B4; background:rgba(95,199,180,0.13); border-color:rgba(95,199,180,0.32); }
+    .st-violet { color:#9BC56E; background:rgba(155,197,110,0.13); border-color:rgba(155,197,110,0.32); }
+    .st-emerald { color:#4BE08A; background:rgba(75,224,138,0.13); border-color:rgba(75,224,138,0.32); }
+    .st-slate { color:#8FA0B8; background:rgba(143,160,184,0.16); border-color:rgba(143,160,184,0.35); }
+
+    .kpi { cursor:pointer; transition:border-color .18s, transform .18s, background .18s; border-top:3px solid transparent; }
+    .kpi:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
+    .kpi.active { border-color: var(--kc); background: rgba(30,41,59,0.92); box-shadow: 0 0 0 1px var(--kc), 0 8px 24px -12px var(--kc); }
+    .kpi .bar { height:3px; border-radius:2px; margin-top:12px; background: var(--kc); }
+
+    .tbl { table-layout: fixed; width: 100%; border-collapse: collapse; min-width: 840px; }
+    .tbl th { position: sticky; top: 0; z-index: 5; background: #23304c; color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .tbl td { padding: 12px 14px; font-size: 13.5px; border-bottom: 1px solid rgba(148,163,184,0.1); vertical-align: middle; }
+    .tbl tbody tr.row { cursor: pointer; transition: background .15s; }
+    .tbl tbody tr.row:hover { background: rgba(51,65,85,0.35); }
+    .tbl tbody tr.detail td { background: rgba(15,23,42,0.55); padding: 14px 18px 16px; }
+    .tbl .empty td { text-align: center; padding: 40px 0; color: #64748b; }
+
+    .tl { position: relative; }
+    .tl-item { position: relative; padding-left: 22px; padding-bottom: 14px; }
+    .tl-item:last-child { padding-bottom: 2px; }
+    .tl-item::before { content: ""; position: absolute; left: 4px; top: 5px; bottom: 0; width: 2px; background: rgba(100,116,139,0.35); }
+    .tl-item:last-child::before { height: 11px; }
+    .tl-dot { position: absolute; left: 1px; top: 4px; width: 8px; height: 8px; border-radius: 9999px; background: #356B3F; }
+    .tl-item.pending .tl-dot { background: transparent; border: 2px solid #94a3b8; }
+    .tl-item .tl-date { color: #64748b; font-size: 11.5px; }
+
+    .ptl { position: relative; }
+    .ptl-item { position: relative; padding-left: 26px; padding-bottom: 26px; }
+    .ptl-item::before { content: ""; position: absolute; left: 8px; top: 10px; bottom: 0; width: 2px; background: rgba(53,107,63,0.35); }
+    .ptl-item:last-child::before { height: 12px; }
+    .ptl-dot { position: absolute; left: 5px; top: 4px; width: 8px; height: 8px; border-radius: 9999px; background: #356B3F; box-shadow: 0 0 0 4px rgba(53,107,63,0.18); }
+
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; color:#cbd5e1; cursor:pointer; font-size:14px; transition: all .15s; border:1px solid transparent; }
+    .nav-item:hover { background: #1e293b; color:#fff; }
+    .nav-item.active { background: rgba(53,107,63,0.16); color:#8BC39A; border-color: rgba(53,107,63,0.35); }
+    .chip { display:inline-flex; padding:1px 8px; border-radius:6px; font-size:11px; color:#94a3b8; background:#1e293b; border:1px solid rgba(148,163,184,0.2); white-space:nowrap; }
+    #clock-chip { font-size:14px; font-weight:700; color:#2A2723; background:rgba(53,107,63,0.10); border:1.5px solid rgba(53,107,63,0.45); border-radius:9px; padding:4px 12px; letter-spacing:.02em; box-shadow:0 1px 2px rgba(53,107,63,.08); white-space:nowrap; }
+    body:not(.light) #clock-chip { color:#E6F0E9; background:rgba(53,107,63,0.22); border-color:rgba(139,195,154,0.5); box-shadow:0 1px 2px rgba(0,0,0,.25); }
+    /* 投递日历 */
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+    .cal-hd { text-align:center; font-size:12px; color:#6B665C; padding:4px 0; font-weight:600; }
+    .cal-cell { min-height:88px; border-radius:10px; border:1px solid rgba(70,60,40,0.12); background:rgba(255,254,250,0.65); padding:5px 7px; display:flex; flex-direction:column; gap:3px; overflow:hidden; }
+    .cal-cell.out { opacity:.35; background:rgba(255,254,250,0.3); }
+    .cal-cell.today { border-color:#356B3F; box-shadow:0 0 0 1px #356B3F inset; }
+    .cal-cell.has-dd { background:rgba(139,195,154,0.10); }
+    .cal-day { font-size:12px; font-weight:700; color:#2A2723; }
+    .cal-day.dead { color:#B4473F; }
+    .cal-item { font-size:11px; text-align:left; color:#356B3F; background:rgba(53,107,63,0.10); border-radius:5px; padding:1px 5px; line-height:1.45; cursor:pointer; border:1px solid transparent; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cal-item:hover { border-color:rgba(53,107,63,0.4); }
+    .cal-item.dead { color:#B4473F; background:rgba(180,71,63,0.10); }
+    .cal-more { font-size:10px; color:#6B665C; }
+    .cal-row { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:8px 12px; border-radius:10px; border:1px solid rgba(70,60,40,0.12); background:rgba(255,254,250,0.6); cursor:pointer; }
+    .cal-row:hover { border-color:rgba(53,107,63,0.4); background:rgba(255,254,250,0.95); }
+    .cal-row .d { font-size:12px; font-weight:700; color:#2A2723; min-width:74px; }
+    .cal-row .co { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cal-row .co .n { font-size:13px; font-weight:600; color:#2A2723; }
+    .cal-row .co .r { font-size:11px; color:#6B665C; }
+    .cal-badge { font-size:11px; font-weight:700; border-radius:999px; padding:2px 8px; white-space:nowrap; }
+    .cal-badge.soon { color:#7A4E0F; background:rgba(222,158,64,0.16); }
+    .cal-badge.over { color:#B4473F; background:rgba(180,71,63,0.12); }
+    .cal-badge.ok { color:#356B3F; background:rgba(53,107,63,0.12); }
+    .cal-badge.gray { color:#6B665C; background:rgba(107,102,92,0.12); }
+    .dd { padding:1px 8px; border-radius:9999px; font-size:10px; font-weight:600; }
+    .dd-ok { color:#356B3F; background:rgba(53,107,63,0.12); }
+    .dd-soon { color:#B4473F; background:rgba(180,71,63,0.12); }
+    .dd-over { color:#B4473F; background:rgba(180,71,63,0.18); text-decoration:line-through; }
+    .cal-details summary { cursor:pointer; font-size:12px; font-weight:600; color:#6B665C; padding:8px 0 2px; }
+    .cal-details[open] summary { color:#356B3F; }
+    body:not(.light) .cal-details summary { color:#94a3b8; }
+    body:not(.light) .cal-details[open] summary { color:#8BC39A; }
+    body:not(.light) .cal-hd { color:#94a3b8; }
+    body:not(.light) .cal-cell { border-color:rgba(148,163,184,0.15); background:rgba(30,41,59,0.45); }
+    body:not(.light) .cal-cell.today { border-color:#5B8F68; box-shadow:0 0 0 1px #5B8F68 inset; }
+    body:not(.light) .cal-day { color:#e2e8f0; }
+    body:not(.light) .cal-item { color:#8BC39A; background:rgba(53,107,63,0.22); }
+    body:not(.light) .cal-item.dead { color:#F0A9A2; background:rgba(180,71,63,0.22); }
+    body:not(.light) .cal-more { color:#94a3b8; }
+    body:not(.light) .cal-row { border-color:rgba(148,163,184,0.15); background:rgba(30,41,59,0.45); }
+    body:not(.light) .cal-row .d { color:#e2e8f0; }
+    body:not(.light) .cal-row .co .n { color:#f1f5f9; }
+    body:not(.light) .cal-row .co .r { color:#94a3b8; }
+    body:not(.light) .cal-badge.soon { color:#F0C98A; background:rgba(222,158,64,0.2); }
+    body:not(.light) .cal-badge.over { color:#F0A9A2; background:rgba(180,71,63,0.24); }
+    body:not(.light) .cal-badge.ok { color:#8BC39A; background:rgba(53,107,63,0.24); }
+    body:not(.light) .cal-badge.gray { color:#94a3b8; background:rgba(148,163,184,0.18); }
+    body:not(.light) .dd-ok { color:#8BC39A; background:rgba(53,107,63,0.24); }
+    body:not(.light) .dd-soon { color:#F0AFA8; background:rgba(180,71,63,0.22); }
+    body:not(.light) .dd-over { color:#F0AFA8; background:rgba(180,71,63,0.30); text-decoration:line-through; }
+
+    .ctrl { background:#1e293b; border:1px solid rgba(148,163,184,0.22); color:#e2e8f0; border-radius:10px; font-size:14px; }
+    .ctrl:focus { outline:none; border-color:#3E7A48; }
+    select.ctrl option { background:#1e293b; }
+    .field label { display:block; font-size:12.5px; color:#94a3b8; margin-bottom:5px; }
+    .field label b { color:#f87171; font-weight:500; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:10px; font-size:13.5px; font-weight:500; padding:9px 16px; cursor:pointer; transition: all .15s; border:1px solid transparent; }
+    .btn-primary { background:#356B3F; color:#fff; }
+    .btn-primary:hover { background:#2C5A34; }
+    .btn-ghost { background:#1e293b; color:#cbd5e1; border-color:rgba(148,163,184,0.25); }
+    .btn-ghost:hover { background:#263449; color:#fff; }
+    .icon-btn { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; padding:6px 11px; border-radius:8px; background:#1e293b; color:#a5b4c5; border:1px solid rgba(148,163,184,0.2); cursor:pointer; transition:all .15s; white-space:nowrap; }
+    button[disabled] { opacity:.35; cursor:not-allowed; }
+    .icon-btn:hover { background:#263449; color:#fff; }
+
+    .chart-box { height: 230px; }
+    @media (max-width: 640px) { .chart-box { height: 210px; } }
+    .hidden-v { display: none !important; }
+    .p-card { transition: border-color .15s, transform .15s, background .15s; }
+    .p-card:hover { border-color: rgba(53,107,63,0.45); transform: translateY(-1px); }
+    body.light .p-card:hover { background: rgba(255,254,250,0.9); }
+    .toc-hit { animation: tocFlash 1.6s ease 1; }
+    @keyframes tocFlash { 0% { box-shadow: 0 0 0 0 rgba(53,107,63,0); } 30% { box-shadow: 0 0 0 2px rgba(53,107,63,0.5); } 100% { box-shadow: 0 0 0 0 rgba(53,107,63,0); } }
+
+    /* ===== 暖白主题（light theme，默认，body.light 覆盖） ===== */
+    body.light {
+        --panel: rgba(255,254,250,0.82);
+        --line: rgba(70,60,40,0.16);
+        --text: #2A2723;
+        --muted: #6B665C;
+        background:
+            radial-gradient(1100px 560px at 12% -8%, rgba(91,126,108,0.10), transparent 62%),
+            radial-gradient(900px 520px at 108% 18%, rgba(53,107,63,0.07), transparent 58%),
+            linear-gradient(168deg, #F8F5EE 0%, #F4F0E7 55%, #EEE9DD 100%);
+        background-attachment: fixed;
+        color: var(--text);
+    }
+    body.light .glass-panel { background: var(--panel); border-color: rgba(70,60,40,0.14); }
+    body.light .tbl th { background: #EFEBE0; color: #6B665C; }
+    body.light .tbl tbody tr.row:hover { background: rgba(70,60,40,0.06); }
+    body.light .tbl tbody tr.detail td { background: rgba(255,254,250,0.72); }
+    body.light .nav-item:hover { background: #EDE8DC; color: #2A2723; }
+    body.light .nav-item.active { background: rgba(53,107,63,0.12); color: #356B3F; border-color: rgba(53,107,63,0.3); }
+    body.light .chip { background: #F2EEE3; color: #6B665C; border-color: rgba(70,60,40,0.16); }
+    body.light .ctrl { background: #FAF8F1; border-color: rgba(70,60,40,0.18); color: #2A2723; }
+    body.light select.ctrl option { background: #FDFBF5; }
+    body.light .kpi.active { background: rgba(255,254,250,0.97); }
+    body.light .modal-overlay { background: rgba(90,80,60,0.4); }
+    body.light .modal-panel { background: #FDFBF5; border-color: rgba(70,60,40,0.16); box-shadow: 0 24px 64px -16px rgba(70,60,40,0.28); }
+    body.light #toast { background: #FDFBF5; border-color: rgba(53,107,63,0.5); color: #2A2723; box-shadow: 0 12px 32px -12px rgba(70,60,40,0.28); }
+    body.light ::-webkit-scrollbar-track { background: #ECE7DB; }
+    body.light ::-webkit-scrollbar-thumb { background: #C9C2B2; }
+    body.light ::-webkit-scrollbar-thumb:hover { background: #AFA794; }
+    body.light .field label { color: #6B665C; }
+    /* 状态色（远山青 / 森林绿 家族） */
+    body.light .st-blue { color:#4E7A6A; background:rgba(78,122,106,0.12); border-color:rgba(78,122,106,0.3); }
+    body.light .st-amber { color:#6B7F45; background:rgba(107,127,69,0.12); border-color:rgba(107,127,69,0.3); }
+    body.light .st-cyan { color:#2F7D6E; background:rgba(47,125,110,0.12); border-color:rgba(47,125,110,0.3); }
+    body.light .st-violet { color:#2E7D4F; background:rgba(46,125,79,0.12); border-color:rgba(46,125,79,0.3); }
+    body.light .st-emerald { color:#356B3F; background:rgba(53,107,63,0.12); border-color:rgba(53,107,63,0.3); }
+    body.light .st-slate { color:#8A857B; background:rgba(138,133,123,0.12); border-color:rgba(138,133,123,0.28); }
+    /* Tailwind 文字类暖白映射（墨黑 / 深炭灰） */
+    body.light .text-slate-100 { color:#2A2723; }
+    body.light .text-slate-200 { color:#33302B; }
+    body.light .text-slate-300 { color:#45423B; }
+    body.light .text-slate-400 { color:#57534C; }
+    body.light .text-slate-500 { color:#6B665C; }
+    body.light .text-slate-600 { color:#8A857B; }
+    body.light .text-blue-300 { color:#356B3F; }
+    body.light .text-blue-400 { color:#2C5A34; }
+    body.light .text-red-400 { color:#B4473F; }
+    body.light .text-emerald-400 { color:#2E7D4F; }
+    /* Tailwind 背景 / 边框类暖白映射 */
+    body.light .bg-slate-700\/70 { background: rgba(90,80,60,0.08); }
+    body.light .bg-slate-800\/40 { background: rgba(255,254,250,0.6); }
+    body.light .bg-slate-800\/50 { background: rgba(255,254,250,0.72); }
+    body.light .bg-slate-800\/60 { background: rgba(255,254,250,0.8); }
+    body.light .bg-blue-900\/20 { background: rgba(53,107,63,0.12); }
+    body.light .bg-red-500\/10 { background: rgba(180,71,63,0.08); }
+    body.light .border-slate-700\/50 { border-color: rgba(70,60,40,0.14); }
+    body.light .border-slate-700\/60 { border-color: rgba(70,60,40,0.16); }
+    body.light .border-red-400\/30 { border-color: rgba(180,71,63,0.3); }
+
+    .modal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(2,6,23,0.66); backdrop-filter: blur(4px); display:flex; align-items:flex-start; justify-content:center; padding: 16px; overflow-y:auto; }
+    .modal-panel { width: 100%; max-width: 620px; background:#16213a; border:1px solid rgba(148,163,184,0.22); border-radius:16px; box-shadow: 0 24px 64px -16px rgba(0,0,0,.6); }
+    @media (min-width: 640px) { .modal-overlay { align-items:center; } }
+
+    #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); z-index: 80; background:#1e293b; border:1px solid rgba(53,107,63,.45); color:#e2e8f0; font-size:13.5px; padding:10px 18px; border-radius:10px; opacity:0; pointer-events:none; transition: all .25s; box-shadow: 0 12px 32px -12px rgba(0,0,0,.6); }
+    #toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body class="font-sans antialiased">
+
+<div class="lg:flex h-screen overflow-hidden">
+
+    <!-- ===== 侧边导航（桌面） ===== -->
+    <aside class="hidden lg:flex w-64 shrink-0 glass-panel flex-col border-r border-slate-700/50 relative z-10">
+        <div class="p-6 pb-4">
+            <div class="flex items-center gap-2.5">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+                <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#5B7E6C] to-[#2F6E48]">秋招管理终端</h1>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Data &amp; Agriculture Focus</p>
+        </div>
+        <nav class="flex-1 px-4 space-y-1.5">
+            <div class="nav-item active" data-view="overview">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8" rx="1"/><rect x="12.5" y="6" width="3" height="12" rx="1"/><rect x="18" y="13" width="3" height="5" rx="1"/></svg>
+                投递总览
+            </div>
+            <div class="nav-item" data-view="timeline">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                进度时间轴
+            </div>
+            <div class="nav-item" data-view="interview">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                面试题库
+            </div>
+            <div class="nav-item" data-view="pending">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="M9 12l2 2 4-4"/></svg>
+                待投递
+            </div>
+            <div class="nav-item" data-view="calendar">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                投递日历
+            </div>
+        </nav>
+        <div class="p-5 border-t border-slate-700/50 space-y-2.5">
+            <button id="btn-add-side" class="btn btn-primary w-full">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增投递
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btn-export" class="btn btn-ghost !py-2 !text-xs" title="导出投递数据 JSON">导出</button>
+                <button id="btn-reset" class="btn btn-ghost !py-2 !text-xs" title="重置为飞书表格初始数据">重置</button>
+            </div>
+            <button id="btn-theme" class="btn btn-ghost w-full !py-2 !text-xs" title="切换白天 / 夜间模式">
+                <svg id="theme-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <span id="theme-label">白天模式</span>
+            </button>
+            <p class="text-[11px] text-slate-500 leading-relaxed pt-1">初始 41 条来自飞书表格「数据表」，编辑内容保存在本机浏览器。</p>
+        </div>
+    </aside>
+
+    <!-- ===== 主内容区 ===== -->
+    <main class="flex-1 h-full overflow-y-auto relative">
+
+        <!-- 移动端顶部导航 -->
+        <div class="lg:hidden sticky top-0 z-20 glass-panel border-b border-slate-700/50 px-4 py-2.5 flex items-center gap-2 overflow-x-auto">
+            <span class="text-sm font-bold mr-auto">秋招管理终端</span>
+            <div class="nav-item active !py-1.5 !px-3 !text-[13px]" data-view="overview">总览</div>
+            <div class="nav-item !py-1.5 !px-3 !text-[13px]" data-view="timeline">时间轴</div>
+            <div class="nav-item !py-1.5 !px-3 !text-[13px]" data-view="interview">题库</div>
+            <div class="nav-item !py-1.5 !px-3 !text-[13px]" data-view="pending">待投递</div>
+            <div class="nav-item !py-1.5 !px-3 !text-[13px]" data-view="calendar">日历</div>
+            <button id="btn-theme-m" class="nav-item !py-1.5 !px-2.5 !text-[13px] shrink-0" title="切换白天 / 夜间模式" aria-label="切换主题">
+                <svg id="theme-icon-m" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+            <button id="btn-add-m" class="btn btn-primary !px-3 !py-1.5 !text-[13px]">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增
+            </button>
+        </div>
+
+        <div class="absolute top-0 right-0 w-96 h-96 bg-blue-900/20 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+
+        <div class="p-4 md:p-8">
+
+            <!-- ===== 视图：投递总览 ===== -->
+            <section id="view-overview">
+                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">投递追踪仪表盘</h2>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span class="chip num" id="clock-chip"></span>
+                        <button id="btn-apply-export" class="btn btn-ghost !py-2 !text-xs" title="导出为飞书可导入的 CSV">导出CSV</button>
+                        <button id="btn-apply-import" class="btn btn-ghost !py-2 !text-xs" title="从飞书导出的 CSV 导入（旧数据自动备份）">导入CSV</button>
+                        <button id="btn-add" class="btn btn-primary">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增投递
+                        </button>
+                    </div>
+                </header>
+
+                <!-- KPI 卡片 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3.5 md:gap-5 mb-7" id="kpi-grid"></div>
+
+                <!-- 图表区 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 mb-7">
+                    <div class="glass-panel rounded-2xl p-4 md:p-5">
+                        <h3 class="text-sm font-semibold">状态分布</h3>
+                        <div id="chart-status" class="chart-box"></div>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-4 md:p-5">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <h3 class="text-sm font-semibold">投递节奏</h3>
+                            <div class="flex items-center gap-1">
+                                <button id="btn-heat-prev" class="icon-btn !px-2 !py-1" title="上一月" aria-label="上一月">
+                                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                                </button>
+                                <span id="heat-month-label" class="num text-xs font-semibold text-slate-300 min-w-[52px] text-center">2026-09</span>
+                                <button id="btn-heat-next" class="icon-btn !px-2 !py-1" title="下一月" aria-label="下一月">
+                                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="chart-month" class="chart-box"></div>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-4 md:p-5">
+                        <h3 class="text-sm font-semibold">单位性质 / 方向标签</h3>
+                        <div id="chart-nature" class="chart-box"></div>
+                    </div>
+                </div>
+
+                <!-- 投递明细表 -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="p-4 md:p-5 pb-3 flex flex-wrap gap-3 items-center border-b border-slate-700/50">
+                        <h3 class="text-base font-semibold mr-auto">投递明细</h3>
+                        <div class="relative">
+                            <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                            <input id="search" type="text" placeholder="搜索公司 / 岗位"
+                                class="ctrl pl-9 pr-3 py-2 w-full md:w-56" autocomplete="off">
+                        </div>
+                        <select id="status-filter" class="ctrl px-3 py-2">
+                            <option value="全部">全部状态</option>
+                            <option value="进行中">进行中（投递→面试）</option>
+                            <option value="已投递">已投递</option>
+                            <option value="已笔试">已笔试</option>
+                            <option value="已一面">已一面</option>
+                            <option value="面试中">面试中</option>
+                            <option value="已拿Offer">已拿 Offer</option>
+                            <option value="面试推进">面试推进（一面+面试中）</option>
+                            <option value="已终止">已终止</option>
+                        </select>
+                        <span class="text-xs text-slate-500 num" id="result-count"></span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[480px]">
+                        <table class="tbl">
+                            <colgroup>
+                                <col style="width:18%"><col style="width:24%"><col style="width:9%"><col style="width:13%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:7%">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>公司</th><th>岗位</th><th>Base</th><th>薪资</th><th>状态</th><th>投递时间</th><th>最新进度</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== 视图：进度时间轴 ===== -->
+            <section id="view-timeline" class="hidden-v">
+                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">进度时间轴</h2>
+                    </div>
+                    <span class="chip" id="tl-count"></span>
+                </header>
+                <div class="glass-panel rounded-2xl p-5 md:p-7">
+                    <div class="ptl" id="timeline-body"></div>
+                </div>
+            </section>
+
+            <!-- ===== 视图：面试题库 ===== -->
+            <section id="view-interview" class="hidden-v">
+                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">面试题库</h2>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span class="chip num" id="iq-stats"></span>
+                        <button id="btn-q-add" class="btn btn-primary">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增题目
+                        </button>
+                    </div>
+                </header>
+
+                <!-- 总览：自我介绍攻击面 / 完整题库 / 练习计划 / 已掌握进度 -->
+                <div class="glass-panel rounded-2xl p-5 md:p-6 mb-5">
+                    <div class="grid grid-cols-3 gap-3 mb-4">
+                        <div class="rounded-xl bg-slate-800/50 border border-slate-700/50 p-3.5">
+                            <div class="num text-2xl font-bold text-blue-300" id="ov-attack">–</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">自我介绍攻击面</div>
+                        </div>
+                        <div class="rounded-xl bg-slate-800/50 border border-slate-700/50 p-3.5">
+                            <div class="num text-2xl font-bold text-blue-300" id="ov-total">–</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">完整题库</div>
+                        </div>
+                        <div class="rounded-xl bg-slate-800/50 border border-slate-700/50 p-3.5">
+                            <div class="num text-2xl font-bold text-blue-300" id="ov-plan">–</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">练习计划</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 mb-4" id="ov-attacks"></div>
+                    <div class="mb-3">
+                        <div class="flex items-center justify-between text-xs mb-1.5">
+                            <span class="text-slate-400">已掌握 · 练习进度</span>
+                            <span class="num" id="ov-progress-text">0/0</span>
+                        </div>
+                        <div class="h-2 rounded-full bg-slate-700/70 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" id="ov-progress-bar" style="width:0%;background:linear-gradient(90deg,#5B7E6C,#2F6E48)"></div>
+                        </div>
+                    </div>
+                    <div class="text-[11px] leading-relaxed text-slate-500 space-y-1">
+                        <p>· 参考答案要点：每题答案保留「优秀回答」的完整表达与记忆关键词</p>
+                        <p>· 评分锚点：信息完整、有具体数据/案例、结构清晰（行为题用 STAR）</p>
+                        <p>· 标注[需补充]的题目：请自行补全你的真实经历与细节</p>
+                    </div>
+                </div>
+
+                <!-- 练习计划 6 步 -->
+                <div class="glass-panel rounded-2xl p-5 md:p-6 mb-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <h3 class="text-base font-semibold">练习计划</h3>
+                        <span class="chip num" id="plan-stats">0/0</span>
+                    </div>
+                    <div id="plan-list" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2"></div>
+                </div>
+
+                <!-- 题库布局：左侧悬浮目录 + 题目列表 -->
+                <div class="flex items-start gap-5">
+                    <aside id="iq-toc" class="hidden lg:block w-56 shrink-0 sticky top-5 max-h-[calc(100vh-140px)] overflow-y-auto glass-panel rounded-2xl p-4 self-start">
+                        <p class="text-[11px] font-medium tracking-widest text-slate-500 mb-2">题目目录</p>
+                        <div id="iq-toc-list"></div>
+                    </aside>
+                    <div class="flex-1 min-w-0">
+                        <div id="iq-toc-m" class="lg:hidden mb-4 flex gap-2 overflow-x-auto -mx-1 px-1 pb-1"></div>
+                        <div class="glass-panel rounded-2xl p-5 md:p-6">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                <h3 class="text-base font-semibold">题目清单</h3>
+                            </div>
+                            <div id="question-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== 视图：待投递池 ===== -->
+            <section id="view-pending" class="hidden-v">
+                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">待投递池</h2>
+                        <p class="text-xs text-slate-500 mt-1.5">先记下想投的公司，之后随时点开补全信息</p>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span class="chip num" id="pd-stats">0 项</span>
+                        <button id="btn-pd-export" class="btn btn-ghost !py-2 !text-xs" title="导出为飞书可导入的 CSV">导出CSV</button>
+                        <button id="btn-pd-import" class="btn btn-ghost !py-2 !text-xs" title="从飞书导出的 CSV 导入（旧数据自动备份）">导入CSV</button>
+                    </div>
+                </header>
+
+                <div class="glass-panel rounded-2xl p-5 md:p-6 mb-5">
+                    <div class="flex gap-2">
+                        <input id="pd-input" class="ctrl w-full px-3 py-2.5" placeholder="输入公司 / 职位名称，如：玛氏 供应链管培" autocomplete="off">
+                        <button id="btn-pd-add" class="btn btn-primary shrink-0">添加</button>
+                    </div>
+                </div>
+
+                <div id="pd-list" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+            </section>
+
+        </div>
+    </main>
+</div>
+
+<!-- ===== 编辑弹窗 ===== -->
+<div id="modal" class="modal-overlay hidden-v">
+    <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="flex items-center justify-between mb-5">
+            <h3 id="modal-title" class="text-lg font-bold">新增投递</h3>
+            <button id="modal-close" class="icon-btn !px-2.5" aria-label="关闭">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form id="app-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="field">
+                <label>公司名称 <b>*</b></label>
+                <input name="company" required class="ctrl w-full px-3 py-2.5" placeholder="如：先正达">
+            </div>
+            <div class="field">
+                <label>岗位 <b>*</b></label>
+                <input name="role" required class="ctrl w-full px-3 py-2.5" placeholder="如：供应链管培">
+            </div>
+            <div class="field">
+                <label>状态</label>
+                <select name="status" class="ctrl w-full px-3 py-2.5">
+                    <option>已投递</option><option>已笔试</option><option>已一面</option>
+                    <option>面试中</option><option>已拿Offer</option><option>已终止</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Base / 工作地点</label>
+                <input name="base" class="ctrl w-full px-3 py-2.5" placeholder="多个地点用逗号分隔，如：上海,北京">
+            </div>
+            <div class="field">
+                <label>薪资</label>
+                <input name="salary" class="ctrl w-full px-3 py-2.5" placeholder="如：10-15k">
+            </div>
+            <div class="field">
+                <label>投递链接</label>
+                <input name="link" type="url" class="ctrl w-full px-3 py-2.5" placeholder="https://...">
+            </div>
+            <div class="field">
+                <label>投递时间</label>
+                <input name="applyTime" type="date" class="ctrl w-full px-3 py-2.5">
+            </div>
+            <div class="field">
+                <label>最新进度日期</label>
+                <input name="latestDate" type="date" class="ctrl w-full px-3 py-2.5">
+            </div>
+            <div class="field">
+                <label>截止日期</label>
+                <input name="deadline" type="date" class="ctrl w-full px-3 py-2.5">
+            </div>
+            <div class="field">
+                <label>单位性质 / 方向标签</label>
+                <input name="nature" class="ctrl w-full px-3 py-2.5" placeholder="逗号分隔，如：外企,供应链">
+            </div>
+            <div class="field md:col-span-2">
+                <label>进度时间线（每行一个节点，格式：日期 + 事件）</label>
+                <textarea name="timeline" rows="3" class="ctrl w-full px-3 py-2.5 leading-relaxed" placeholder="9-14 投递&#10;9-15 AI测评&#10;10-22 业务一面"></textarea>
+            </div>
+            <div class="field md:col-span-2">
+                <label>备注</label>
+                <textarea name="remark" rows="2" class="ctrl w-full px-3 py-2.5 leading-relaxed" placeholder="内推码、面经要点等"></textarea>
+            </div>
+            <div class="md:col-span-2 flex justify-end gap-3 mt-1">
+                <button type="button" id="btn-cancel" class="btn btn-ghost">取消</button>
+                <button type="submit" class="btn btn-primary" id="btn-save">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== 视图：投递日历 ===== -->
+            <section id="view-calendar" class="hidden-v">
+                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">投递日历</h2>
+                        <p class="text-sm text-slate-500 mt-1.5">按「截止日期」汇总，点击公司可补全或修改信息</p>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <button id="btn-cal-prev" class="icon-btn !px-2 !py-1" title="上一月" aria-label="上一月">
+                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        </button>
+                        <span id="cal-month-label" class="num text-sm font-bold min-w-[96px] text-center"></span>
+                        <button id="btn-cal-next" class="icon-btn !px-2 !py-1" title="下一月" aria-label="下一月">
+                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                        </button>
+                        <button id="btn-cal-today" class="btn btn-ghost !py-1.5 !text-xs">回到本月</button>
+                    </div>
+                </header>
+                <div class="glass-panel rounded-2xl p-4 md:p-5 mb-5">
+                    <div class="cal-grid" id="cal-grid"></div>
+                </div>
+                <div class="glass-panel rounded-2xl p-4 md:p-5">
+                    <h3 class="text-sm font-semibold mb-3">截止日期清单</h3>
+                    <div id="cal-list" class="space-y-2"></div>
+                </div>
+            </section>
+
+<!-- ===== 题库题目弹窗 ===== -->
+<div id="qmodal" class="modal-overlay hidden-v">
+    <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="qmodal-title">
+        <div class="flex items-center justify-between mb-5">
+            <h3 id="qmodal-title" class="text-lg font-bold">新增题目</h3>
+            <button id="qmodal-close" class="icon-btn !px-2.5" aria-label="关闭">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form id="q-form" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="field">
+                    <label>分类 <b>*</b></label>
+                    <input name="cat" list="cat-list" required class="ctrl w-full px-3 py-2.5" placeholder="如：基础动机认知">
+                </div>
+                <datalist id="cat-list"></datalist>
+                <div class="field">
+                    <label>语言</label>
+                    <select name="lang" class="ctrl w-full px-3 py-2.5">
+                        <option value="zh">中文</option>
+                        <option value="en">英文</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>题目 <b>*</b></label>
+                <textarea name="title" required rows="2" class="ctrl w-full px-3 py-2.5 leading-relaxed" placeholder="输入面试题目"></textarea>
+            </div>
+            <div class="field">
+                <label>参考答案要点</label>
+                <textarea name="answer" rows="4" class="ctrl w-full px-3 py-2.5 leading-relaxed" placeholder="录入你的答题思路、STAR 结构要点等；[需补充] 处留待后续完善"></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="q-cancel" class="btn btn-ghost">取消</button>
+                <button type="submit" class="btn btn-primary">保存题目</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== 待投递编辑弹窗 ===== -->
+<div id="pmodal" class="modal-overlay hidden-v">
+    <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="pmodal-title">
+        <div class="flex items-center justify-between mb-5">
+            <h3 id="pmodal-title" class="text-lg font-bold">编辑待投递</h3>
+            <button id="pmodal-close" class="icon-btn !px-2.5" aria-label="关闭">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <p class="text-[11px] text-slate-500 -mt-2 mb-4">每次保存，&ldquo;更新日期&rdquo;会自动填为编辑当天。</p>
+        <form id="p-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="field md:col-span-2">
+                <label>公司 / 职位名称 <b>*</b></label>
+                <input name="name" required class="ctrl w-full px-3 py-2.5" placeholder="如：玛氏 供应链管培">
+            </div>
+            <div class="field">
+                <label>状态</label>
+                <select name="status" class="ctrl w-full px-3 py-2.5">
+                    <option>待投递</option><option>暂缓</option><option>已投递</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>岗位</label>
+                <input name="role" class="ctrl w-full px-3 py-2.5" placeholder="如：供应链管培">
+            </div>
+            <div class="field">
+                <label>Base / 工作地点</label>
+                <input name="base" class="ctrl w-full px-3 py-2.5" placeholder="如：上海">
+            </div>
+            <div class="field">
+                <label>薪资</label>
+                <input name="salary" class="ctrl w-full px-3 py-2.5" placeholder="如：12-18k">
+            </div>
+            <div class="field">
+                <label>截止日期</label>
+                <input name="deadline" type="date" class="ctrl w-full px-3 py-2.5">
+            </div>
+            <div class="field">
+                <label>投递链接</label>
+                <input name="link" type="url" class="ctrl w-full px-3 py-2.5" placeholder="https://...">
+            </div>
+            <div class="field md:col-span-2">
+                <label>备注</label>
+                <textarea name="note" rows="2" class="ctrl w-full px-3 py-2.5 leading-relaxed" placeholder="截止时间、内推码、要准备的要点等"></textarea>
+            </div>
+            <div class="md:col-span-2 flex items-center justify-between mt-1">
+                <button type="button" id="p-del" class="btn btn-ghost !text-red-400">删除</button>
+                <div class="flex gap-3">
+                    <button type="button" id="p-cancel" class="btn btn-ghost">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== 飞书 CSV 导入弹窗 ===== -->
+<div id="syncmodal" class="modal-overlay hidden-v">
+    <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="syncmodal-title">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="syncmodal-title" class="text-lg font-bold">从 CSV 导入</h3>
+            <button id="syncmodal-close" class="icon-btn !px-2.5" aria-label="关闭">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <p id="syncmodal-desc" class="text-xs text-slate-500 mb-4 leading-relaxed">支持飞书多维表格导出的 CSV。导入将替换当前数据，旧数据会自动备份。</p>
+        <div class="field mb-3">
+            <label>选择文件（飞书多维表格导出）</label>
+            <input type="file" id="sync-file" accept=".csv,text/csv" class="ctrl w-full px-3 py-2.5">
+        </div>
+        <div class="field mb-4">
+            <label>或直接粘贴 CSV 内容</label>
+            <textarea id="sync-text" rows="8" class="ctrl w-full px-3 py-2.5 leading-relaxed font-mono text-xs" placeholder="公司名称,岗位,状态,Base,..."></textarea>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button type="button" id="sync-cancel" class="btn btn-ghost">取消</button>
+            <button type="button" id="sync-import" class="btn btn-primary">导入</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // ===== 数据层（localStorage 持久化） =====
+    const STORE_KEY = "apply-tracker-v1";
+    // 初始数据：来自飞书多维表格「数据表」（2026-11-03 导出，41 条）
+    const SEED_DATA = [{"company":"徐福记","role":"供应链管培","status":"已笔试","base":[],"nature":["外企","供应链"],"salary":"","applyTime":"2026-09-30","latestDate":"2026-10-12","deadline":"","timeline":"10-9 ai测","remark":"ai面报告：[https://rep01.maptqcn.com/reports/shapes/shapes_graduates_participant.aspc?RequestID=e99b6faa-9509-44e4-997f-a8cef0670a07&output=htmlNoRedirect](https://rep01.maptqcn.com/reports/shapes/shapes_graduates_participant.aspc?RequestID=e99b6faa-9509-44e4-997f-a8cef0670a07&output=htmlNoRedirect)","link":"https://app.mokahr.com/campus-recruitment/hfc-foods/102201?locale=zh-CN#/apply/edit/853266920"},{"company":"蒙牛","role":"精益运营(J67575) 毕业生项目","status":"已终止","base":["焦作"],"nature":["消费品","制造业"],"salary":"","applyTime":"2026-09-30","latestDate":"2026-10-15","deadline":"","timeline":"","remark":"","link":"https://mengniu.zhiye.com/campus/detail?jobAdId=1320d30d-8f7f-438b-b9a8-166d8fc98cd2"},{"company":"蒙牛","role":"供应链未来星(J67634)","status":"已终止","base":["北京"],"nature":["消费品","制造业"],"salary":"","applyTime":"2026-09-30","latestDate":"","deadline":"","timeline":"","remark":"推荐码：IVKT88","link":"https://mengniu.zhiye.com/8/detail?jobAdId=c590ce90-c1a8-4440-8a01-2f882d9bac9b"},{"company":"吉家宠物","role":"2- 产品专员","status":"已投递","base":["上海"],"nature":["产品类","消费品"],"salary":"","applyTime":"2026-09-30","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://jijiapets.jobs.feishu.cn/campus/position/application"},{"company":"吉家宠物","role":"1- 产品PM管培生","status":"已投递","base":["杭州"],"nature":["运营类","消费品"],"salary":"","applyTime":"2026-09-30","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://jijiapets.jobs.feishu.cn/campus/position/application"},{"company":"诺普信","role":"管理培训生（J0359）","status":"已终止","base":[],"nature":[],"salary":"15W-25W","applyTime":"2026-09-29","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://noposion.zhiye.com/campus/jobs"},{"company":"P&G","role":"Customer Business Development Manager","status":"已终止","base":[],"nature":["外企"],"salary":"","applyTime":"2026-09-25","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://recruit.pg.com.cn/campus-recruitment/pg/91935?pjid=2a265f93-9787-470f-9946-72b38fb2684f&uid=1a07cafa1e05c7-13c680-d7eb-1a07cafa1e113f0&p_lang=en_cn&refNum=PGBPGCCN#/job/f415ad51-049e-4ac6-aff8-fbabe04b6afd/campus_apply/thanks?jobId=f415ad51-049e-4ac6-aff8-fbabe04b6afd&applyInfo%5BcampusSiteId%5D=105961&applyInfo%5BaimWorkCity%5D=&applyInfo%5BaimStoreId%5D=&candidateName=%E8%B4%BE%E6%A1%90&candidateId=808917113"},{"company":"P&G","role":"Product Supply Manager – Operation Management","status":"已终止","base":[],"nature":["外企"],"salary":"","applyTime":"2026-09-24","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://recruit.pg.com.cn/campus-recruitment/pg/91935?pjid=2a265f93-9787-470f-9946-72b38fb2684f&uid=1a07cafa1e05c7-13c680-d7eb-1a07cafa1e113f0&p_lang=en_cn&refNum=PGBPGCCN#/job/97d3ef31-0500-41d0-b4d0-1f0ca59b5e93/apply?applyFormId=180121"},{"company":"百事集团","role":"2027年度综合管理培训生","status":"已终止","base":["上海"],"nature":["外企"],"salary":"25w-28w","applyTime":"2026-09-18","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173547190.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173547190%22,%22jobTitle%22%3A%22%E7%99%BE%E4%BA%8B%E9%9B%86%E5%9B%A22027%E5%B9%B4%E5%BA%A6%E7%BB%BC%E5%90%88%E7%AE%A1%E7%90%86%E5%9F%B9%E8%AE%AD%E7%94%9F%22,%22jobRank%22%3A0,%22companyId%22%3A%2210540659%22,%22companyName%22%3A%22%E7%99%BE%E4%BA%8B%EF%BC%88%E4%B8%AD%E5%9B%BD%EF%BC%89%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"百事集团","role":"2027年度供应链管理培训生","status":"已投递","base":["上海"],"nature":["外企","供应链"],"salary":"10-20k","applyTime":"2026-09-18","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173547180.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173547180%22,%22jobTitle%22%3A%22%E7%99%BE%E4%BA%8B%E9%9B%86%E5%9B%A22027%E5%B9%B4%E5%BA%A6%E4%BE%9B%E5%BA%94%E9%93%BE%E7%AE%A1%E7%90%86%E5%9F%B9%E8%AE%AD%E7%94%9F%22,%22jobRank%22%3A1,%22companyId%22%3A%2210540675%22,%22companyName%22%3A%22%E7%99%BE%E4%BA%8B%EF%BC%88%E4%B8%AD%E5%9B%BD%EF%BC%89%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"亿滋","role":"供应链管培-北京","status":"已一面","base":["北京"],"nature":["外企","供应链"],"salary":"","applyTime":"2026-09-14","latestDate":"2026-10-17","deadline":"","timeline":"9-14 投递\n9-15 ai测 \n10-22 一面HR","remark":"","link":"https://www.moseeker.com/position/index/pid/3483459"},{"company":"优衣库","role":"2027迅销集团优衣库UMC经营管理培训生(J15322)","status":"面试中","base":["全国飞"],"nature":["外企"],"salary":"11k-14k","applyTime":"2026-09-12","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://uniqlo.zhiye.com/campus/jobs"},{"company":"优衣库","role":"供应链管理管培生","status":"已笔试","base":["上海"],"nature":["外企","供应链"],"salary":"","applyTime":"2026-09-12","latestDate":"2026-10-30","deadline":"","timeline":"10.30ai测","remark":"","link":"https://frsh.zhiye.com/personal/deliveryRecord"},{"company":"不凡帝范梅勒","role":"供应链管培","status":"已笔试","base":["上海"],"nature":["外企","供应链","消费品"],"salary":"20-25w","applyTime":"2026-09-12","latestDate":"2026-10-26","deadline":"","timeline":"10.26 ai测","remark":"内推码：S3815 Jasper","link":"https://campus.51job.com/2027perfettivanmelle/job.html"},{"company":"百胜","role":"供应链管培（食品安全）","status":"已投递","base":["上海"],"nature":["外企","供应链"],"salary":"14-16k","applyTime":"2026-09-11","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173473490.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173473490%22,%22jobTitle%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE%E7%AE%A1%E5%9F%B9%E7%94%9F%EF%BC%88%E9%A3%9F%E5%93%81%E5%AE%89%E5%85%A8%E6%96%B9%E5%90%91%EF%BC%89%22,%22jobRank%22%3A3,%22companyId%22%3A%227332259%22,%22companyName%22%3A%22%E7%99%BE%E8%83%9C%E5%92%A8%E8%AF%A2%EF%BC%88%E4%B8%8A%E6%B5%B7%EF%BC%89%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"百威中国","role":"供应链管培（采购）","status":"已笔试","base":["武汉"],"nature":["外企","供应链"],"salary":"10-15k","applyTime":"2026-09-11","latestDate":"2026-09-29","deadline":"","timeline":"9-24 认知 \n9-29 ai测","remark":"每周四更新\n内推（小红薯te ID：367840926）","link":"https://app.mokahr.com/campus-recruitment/budweiser/148097#/job/4b76fb9f-2441-4b47-a7ef-46a60b5a8c0f/apply"},{"company":"百威中国","role":"GMT全球管培","status":"已投递","base":[],"nature":["外企"],"salary":"","applyTime":"2026-09-11","latestDate":"","deadline":"","timeline":"","remark":"每周四更新\n内推（小红薯te ID：367840926）","link":"https://app.mokahr.com/campus-recruitment/budweiser/148097#/job/e8e3a89f-9676-4eaf-95fe-206fab4c14d6"},{"company":"强生集团","role":"1- 全球运营领导力发展（GOLD）项目 - GOLD Associate","status":"已投递","base":["西安"],"nature":["外企","运营类"],"salary":"","applyTime":"2026-09-11","latestDate":"","deadline":"","timeline":"","remark":"第一志愿 全球运营领导力发展（GOLD）项目 - GOLD Associate 陕西省-西安\n第2志愿 生产运营管理培训生 江苏省-苏州\n密码：Jia20020918","link":"https://chinacampus.jnj.com.cn/jnj/user/delivery"},{"company":"利乐包装（昆山）有限公司","role":"【2027利乐包装（昆山）有限公司秋季信息 - 校招岗位】-官网","status":"已终止","base":[],"nature":["外企"],"salary":"","applyTime":"2026-09-10","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://jobs.51job.com/campus/caVjFTNFIwBjAAbQNiAWY.html"},{"company":"ZURU","role":"供应链管培生（FMCG-Supply Planner）(001799)","status":"已笔试","base":["深圳"],"nature":["外企","供应链"],"salary":"13k-16k","applyTime":"2026-09-06","latestDate":"2026-09-12","deadline":"","timeline":"9-12 笔试","remark":"","link":"https://wecruit.hotjob.cn/SU69fd5a0e1f17c372512fba62/pb/posDetail.html?postId=6a7597ea1ad6db7cf8f204c3&postType=campus"},{"company":"古茗","role":"2-采购管培生（果汁/咖啡方向）","status":"已投递","base":["杭州"],"nature":["供应链","民营（私企）"],"salary":"15-30k","applyTime":"2026-10-09","latestDate":"2026-10-09","deadline":"","timeline":"","remark":"内推：NTApcK0小红薯","link":"https://app.mokahr.com/campus-recruitment/guming/39377?locale=zh-CN#/candidateHome/applications"},{"company":"古茗","role":"1- 产品中心管培生（未来领袖专项计划）","status":"已投递","base":["杭州"],"nature":["民营（私企）"],"salary":"29-50k","applyTime":"2026-10-09","latestDate":"2026-10-09","deadline":"","timeline":"","remark":"内推：NTApcK0小红薯","link":"https://app.mokahr.com/campus-recruitment/guming/39377?locale=zh-CN#/candidateHome/applications"},{"company":"新希望-Newaim","role":"电商运营管培生 （运营｜采购｜渠道方向）","status":"已投递","base":["广州"],"nature":["外企","跨境电商"],"salary":"8-12k","applyTime":"2026-10-09","latestDate":"2026-10-09","deadline":"","timeline":"","remark":"","link":"https://newaim.zhiye.com/personal/deliveryRecord"},{"company":"旺旺","role":"PM管培生(J27017)","status":"已终止","base":["上海"],"nature":["消费品"],"salary":"10-12k","applyTime":"2026-10-10","latestDate":"2026-11-03","deadline":"","timeline":"10.30ai测","remark":"","link":"https://wantwant.zhiye.com/personal/deliveryRecord"},{"company":"认养一头牛","role":"1- 产品管培生（乳制品/冰淇淋/奶粉产品）(J12373)","status":"已投递","base":["杭州"],"nature":["消费品","产品类"],"salary":"","applyTime":"2026-10-10","latestDate":"2026-10-10","deadline":"","timeline":"","remark":"推荐码\nESVRAA","link":"https://ryytn.zhiye.com/personal/deliveryRecord"},{"company":"认养一头牛","role":"2- 供应链管培生(J12366)","status":"已投递","base":["杭州"],"nature":["消费品","供应链"],"salary":"","applyTime":"2026-10-10","latestDate":"2026-10-10","deadline":"","timeline":"","remark":"","link":"https://ryytn.zhiye.com/personal/deliveryRecord"},{"company":"强生集团","role":"2- 生产运营管理培训生","status":"已投递","base":["苏州"],"nature":["外企","运营类"],"salary":"","applyTime":"2026-09-11","latestDate":"","deadline":"","timeline":"","remark":"","link":"https://chinacampus.jnj.com.cn/jnj/user/delivery"},{"company":"联合利华","role":"1- 供应链-供应链管理方向","status":"已笔试","base":["上海"],"nature":["外企","供应链"],"salary":"10-20k","applyTime":"2026-10-11","latestDate":"2026-10-15","deadline":"","timeline":"10-11 ai测","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173415877.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173415877%22,%22jobTitle%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE-%E4%BE%9B%E5%BA%94%E9%93%BE%E7%AE%A1%E7%90%86%E6%96%B9%E5%90%91%22,%22jobRank%22%3A0,%22companyId%22%3A%229822743%22,%22companyName%22%3A%22%E8%81%94%E5%90%88%E5%88%A9%E5%8D%8E%22%7D"},{"company":"联合利华","role":"2- 消费者市场洞察","status":"已笔试","base":["上海"],"nature":["外企","供应链"],"salary":"10-20k","applyTime":"2026-10-11","latestDate":"2026-10-15","deadline":"","timeline":"10-11 ai测","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173415875.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173415875%22,%22jobTitle%22%3A%22%E6%B6%88%E8%B4%B9%E8%80%85%E5%B8%82%E5%9C%BA%E6%B4%9E%E5%AF%9F%22,%22jobRank%22%3A1,%22companyId%22%3A%229822743%22,%22companyName%22%3A%22%E8%81%94%E5%90%88%E5%88%A9%E5%8D%8E%22%7D"},{"company":"上海家化","role":"供应链培训生","status":"已投递","base":["上海"],"nature":["供应链"],"salary":"8-12k","applyTime":"2026-10-15","latestDate":"2026-10-15","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173531973.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173531973%22,%22jobTitle%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE%E5%9F%B9%E8%AE%AD%E7%94%9F%22,%22jobRank%22%3A0,%22companyId%22%3A%2210564708%22,%22companyName%22%3A%22%E4%B8%8A%E6%B5%B7%E5%AE%B6%E5%8C%96%E8%81%94%E5%90%88%E8%82%A1%E4%BB%BD%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"中粮油脂控股有限公司","role":"计划排产岗","status":"已投递","base":["北京"],"nature":["国企"],"salary":"","applyTime":"2026-10-24","latestDate":"2026-10-24","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173645196.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173645196%22,%22jobTitle%22%3A%22%E8%AE%A1%E5%88%92%E6%8E%92%E4%BA%A7%E5%B2%97%22,%22jobRank%22%3A0,%22companyId%22%3A%229970705%22,%22companyName%22%3A%22%E4%B8%AD%E7%B2%AE%E6%B2%B9%E8%84%82%E6%8E%A7%E8%82%A1%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"中粮粮谷控股有限公司","role":"粮食安全岗","status":"已投递","base":["北京"],"nature":["国企"],"salary":"","applyTime":"2026-10-24","latestDate":"2026-10-24","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173645348.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173645348%22,%22jobTitle%22%3A%22%E9%A3%9F%E5%93%81%E5%AE%89%E5%85%A8%E5%B2%97%22,%22jobRank%22%3A1,%22companyId%22%3A%229970706%22,%22companyName%22%3A%22%E4%B8%AD%E7%B2%AE%E7%B2%AE%E8%B0%B7%E6%8E%A7%E8%82%A1%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"中粮糖业控股股份有限公司","role":"优粮生计划-质量标准管理岗","status":"已投递","base":["北京"],"nature":["国企"],"salary":"","applyTime":"2026-10-24","latestDate":"2026-10-24","deadline":"","timeline":"","remark":"","link":"https://q.yingjiesheng.com/jobdetail/173645603.html?property=%7B%22pageCode%22%3A%22applylist%22,%22jobSource%22%3A%22%E7%BD%91%E7%94%B3%22,%22jobId%22%3A%22173645603%22,%22jobTitle%22%3A%22%E4%BC%98%E7%B2%AE%E7%94%9F%E8%AE%A1%E5%88%92-%E8%B4%A8%E9%87%8F%E6%A0%87%E5%87%86%E7%AE%A1%E7%90%86%E5%B2%97%22,%22jobRank%22%3A2,%22companyId%22%3A%229970708%22,%22companyName%22%3A%22%E4%B8%AD%E7%B2%AE%E7%B3%96%E4%B8%9A%E6%8E%A7%E8%82%A1%E8%82%A1%E4%BB%BD%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%22%7D"},{"company":"卡夫亨氏","role":"1- 综合管培Kraft Heinz Trainee","status":"已笔试","base":["上海"],"nature":["外企","消费品"],"salary":"","applyTime":"2026-10-26","latestDate":"2026-10-28","deadline":"","timeline":"10-26投递","remark":"","link":"https://wecruit.hotjob.cn/SU6295caa60dcad4522994dc1a/pb/posDetail.html?postId=348102&postType=campus"},{"company":"卡夫亨氏","role":"2- 全球制造管培生Global Manufacturing Trainee","status":"已笔试","base":["上海广州青岛阳江"],"nature":["外企","消费品"],"salary":"","applyTime":"2026-10-26","latestDate":"2026-10-28","deadline":"","timeline":"10-26投递","remark":"","link":"https://wecruit.hotjob.cn/SU6295caa60dcad4522994dc1a/pb/posDetail.html?postId=348301&postType=campus"},{"company":"达能中国饮料","role":"营运管培生-区域质量","status":"已投递","base":["成都邛崃"],"nature":["外企","消费品"],"salary":"","applyTime":"2026-10-26","latestDate":"2026-10-26","deadline":"","timeline":"10.26投递","remark":"10.31截止","link":"https://app.mokahr.com/campus-recruitment/danone/170511#/job/5bf36198-6f7d-426a-ada4-7ec5d581513a?from=qrcode"},{"company":"嘉士伯","role":"2- 供应链管培-仓储物流","status":"已投递","base":["常州"],"nature":["外企","供应链"],"salary":"","applyTime":"2026-10-30","latestDate":"2026-10-30","deadline":"","timeline":"10.30投递-","remark":"10.31截止","link":"https://app.mokahr.com/m/candidate/applications/carlsberg"},{"company":"嘉士伯","role":"职能管培","status":"已终止","base":[],"nature":["外企"],"salary":"","applyTime":"2026-10-30","latestDate":"2026-10-30","deadline":"","timeline":"","remark":"10.31截止","link":"https://app.mokahr.com/m/candidate/applications/carlsberg"},{"company":"洽洽","role":"研发类27届管培生(J11989)","status":"已终止","base":["合肥"],"nature":["民营（私企）","消费品"],"salary":"7-12k","applyTime":"2026-10-30","latestDate":"2026-10-30","deadline":"","timeline":"10.30投递-","remark":"","link":"https://qiaqiafood.zhiye.com/campus/jobs?1=%5B%7B%22id%22%3A%2234%22%2C%22label%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE%E7%B1%BB%22%7D%5D"},{"company":"洽洽","role":"采购类27届管培生(J11986)","status":"已终止","base":["合肥"],"nature":["民营（私企）","消费品"],"salary":"7-12k","applyTime":"2026-10-30","latestDate":"2026-10-30","deadline":"","timeline":"10.30投递-","remark":"","link":"https://qiaqiafood.zhiye.com/campus/jobs?1=%5B%7B%22id%22%3A%2234%22%2C%22label%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE%E7%B1%BB%22%7D%5D"},{"company":"洽洽","role":"产品管理类27届管培生(J11983)","status":"已终止","base":["合肥"],"nature":["民营（私企）","消费品"],"salary":"7-12k","applyTime":"2026-10-30","latestDate":"2026-10-30","deadline":"","timeline":"10.30投递-","remark":"","link":"https://qiaqiafood.zhiye.com/campus/jobs?1=%5B%7B%22id%22%3A%2234%22%2C%22label%22%3A%22%E4%BE%9B%E5%BA%94%E9%93%BE%E7%B1%BB%22%7D%5D"}];
+
+    function loadData() {
+        try {
+            const raw = localStorage.getItem(STORE_KEY);
+            if (raw) {
+                const d = JSON.parse(raw);
+                if (Array.isArray(d)) return d;
+            }
+        } catch (e) { /* 损坏则回退种子数据 */ }
+        const seed = JSON.parse(JSON.stringify(SEED_DATA));
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(seed)); } catch (e) {}
+        return seed;
+    }
+    function saveData() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(APPLICATIONS)); } catch (e) { toast("保存失败：浏览器存储不可用"); }
+    }
+    let APPLICATIONS = loadData();
+
+    // ===== 记录唯一 id（删除/编辑按 id 精准定位，避免索引错位） =====
+    function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    function ensureApplyIds() {
+        let changed = false;
+        APPLICATIONS.forEach(x => { if (!x.id) { x.id = uid("a"); changed = true; } });
+        if (changed) saveData();
+    }
+    ensureApplyIds();
+
+    // ===== 一次性找回误删记录（2026-11-04：蒙牛 精益运营(J67575) 毕业生项目） =====
+    // 仅在缺失该条且从未补回过时恢复一次，之后用户可正常删除。
+    function restoreMissingApply() {
+        try {
+            const RESTORE_KEY = "apply-tracker-v1-restored";
+            const restored = JSON.parse(localStorage.getItem(RESTORE_KEY) || "[]");
+            const target = SEED_DATA.find(x => x.company === "蒙牛" && String(x.role).indexOf("J67575") >= 0);
+            const missing = target && !APPLICATIONS.some(x => x.company === target.company && x.role === target.role);
+            if (target && missing && restored.indexOf("mengniu-j67575") < 0) {
+                APPLICATIONS.push(Object.assign({ id: uid("a") }, JSON.parse(JSON.stringify(target))));
+                saveData();
+                restored.push("mengniu-j67575");
+                try { localStorage.setItem(RESTORE_KEY, JSON.stringify(restored)); } catch (e) {}
+                toast("已找回误删记录：蒙牛 精益运营(J67575) 毕业生项目");
+            }
+        } catch (e) {}
+    }
+    restoreMissingApply();
+
+    const STATUS_ORDER = ["已投递", "已笔试", "已一面", "面试中", "已拿Offer", "已终止"];
+    const STATUS_CLS = {
+        "已投递": "st-blue", "已笔试": "st-amber", "已一面": "st-cyan", "面试中": "st-violet", "已拿Offer": "st-emerald", "已终止": "st-slate"
+    };
+    let KPI_HEX = { "全部": "#AFA794", "进行中": "#5B7E6C", "已笔试": "#356B3F", "面试推进": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A", "待投递": "#7A8C4E" };
+    let STATUS_HEX = {
+        "已投递": "#7FB3A0", "已笔试": "#A8C686", "已一面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8"
+    };
+    const FILTER_MAP = {
+        "全部": null,
+        "进行中": ["已投递", "已笔试", "已一面", "面试中"],
+        "已投递": ["已投递"], "已笔试": ["已笔试"], "已一面": ["已一面"], "面试中": ["面试中"],
+        "已拿Offer": ["已拿Offer"],
+        "面试推进": ["已一面", "面试中"],
+        "已终止": ["已终止"]
+    };
+
+    // ===== 工具 =====
+    function escapeHtml(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function shortDate(d) { return d ? d.slice(5).replace(/-/g, ".") : ""; }
+    function remarkHtml(s) {
+        if (!s) return "";
+        return escapeHtml(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener" class="text-blue-400 hover:underline break-all">$1</a>');
+    }
+    function chips(arr) { return arr.map(x => '<span class="chip">' + escapeHtml(x) + '</span>').join(" "); }
+    function statusBadge(st) {
+        return '<span class="st ' + (STATUS_CLS[st] || "st-slate") + '">' + escapeHtml(st || "未知") + "</span>";
+    }
+    function fmtMoney(s) {
+        if (!s) return '<span class="text-slate-600">—</span>';
+        return '<span class="num">' + escapeHtml(s) + "</span>";
+    }
+    const $ = id => document.getElementById(id);
+    let toastTimer = null;
+    function toast(msg) {
+        const t = $("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+    }
+    function today() {
+        const d = new Date();
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+
+    // ===== 全局状态 =====
+    const state = { view: "overview", q: "", filterKey: "全部", expanded: new Set(), editingIdx: null, mode: "add" };
+
+    // ===== KPI =====
+    function kpiData() {
+        const by = {};
+        APPLICATIONS.forEach(a => { by[a.status] = (by[a.status] || 0) + 1; });
+        const total = APPLICATIONS.length;
+        const active = total - (by["已终止"] || 0);
+        return [
+            { key: "全部", label: "全部投递", value: total, color: KPI_HEX["全部"] },
+            { key: "进行中", label: "进行中", value: active, color: KPI_HEX["进行中"] },
+            { key: "已笔试", label: "笔试 / 测评", value: by["已笔试"] || 0, color: KPI_HEX["已笔试"] },
+            { key: "面试推进", label: "面试推进", value: (by["已一面"] || 0) + (by["面试中"] || 0), color: KPI_HEX["面试推进"] },
+            { key: "已拿Offer", label: "已拿 Offer", value: by["已拿Offer"] || 0, color: KPI_HEX["已拿Offer"] },
+            { key: "已终止", label: "已终止", value: by["已终止"] || 0, color: KPI_HEX["已终止"] },
+            { key: "待投递", label: "待投递", value: PENDING.items.length, color: KPI_HEX["待投递"] }
+        ];
+    }
+    function renderKpis() {
+        loadPending();
+        const grid = $("kpi-grid");
+        grid.innerHTML = kpiData().map(k => `
+            <div class="glass-panel rounded-2xl p-4 md:p-5 kpi ${k.key === "待投递" ? "sm:col-span-2 xl:col-span-1 cursor-pointer" : ""} ${state.filterKey === k.key ? "active" : ""}" style="--kc:${k.color}" data-key="${k.key}" ${k.key === "待投递" ? 'title="前往待投递池"' : ""}>
+                <p class="text-xs text-slate-400 font-medium mb-1">${k.label}${k.key === "待投递" ? " →" : ""}</p>
+                <div class="text-3xl md:text-[34px] font-bold num" style="color:${k.color}">${k.value}</div>
+                <div class="bar"></div>
+            </div>`).join("");
+        grid.querySelectorAll(".kpi").forEach(el => {
+            el.addEventListener("click", () => {
+                if (el.dataset.key === "待投递") { switchView("pending"); return; }
+                setFilter(el.dataset.key);
+            });
+        });
+    }
+
+    // ===== 图表 =====
+        // ===== 主题（白天 / 夜间） =====
+    const THEME_KEY = "dashboard-theme";
+    let CHT = { axis: "#94a3b8", label: "#e2e8f0", sub: "#cbd5e1", grid: "rgba(148,163,184,.12)", line: "rgba(148,163,184,.3)", tipBg: "#1e293b", tipBorder: "rgba(148,163,184,.3)" };
+    let TIP = { backgroundColor: "#1e293b", borderColor: "rgba(148,163,184,.3)", textStyle: { color: "#e2e8f0", fontSize: 12 } };
+    function refreshChartTheme() {
+        const light = document.body.classList.contains("light");
+        if (light) {
+            CHT = { axis: "#6B665C", label: "#2A2723", sub: "#57534C", grid: "rgba(70,60,40,.1)", line: "rgba(70,60,40,.22)", tipBg: "#FDFBF5", tipBorder: "rgba(70,60,40,.2)", border: "#E9E4D8", bar: "#356B3F", barOther: "#9A958A", heat: ["#EFEBDF", "#B9C8B2", "#6E8F7E", "#356B3F"] };
+            KPI_HEX = { "全部": "#C9C2B2", "进行中": "#5B7E6C", "已笔试": "#356B3F", "面试推进": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A", "待投递": "#7A8C4E" };
+            STATUS_HEX = { "已投递": "#5B7E6C", "已笔试": "#356B3F", "已一面": "#7A8C4E", "面试中": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A" };
+        } else {
+            CHT = { axis: "#94a3b8", label: "#e2e8f0", sub: "#cbd5e1", grid: "rgba(148,163,184,.12)", line: "rgba(148,163,184,.3)", tipBg: "#1e293b", tipBorder: "rgba(148,163,184,.3)", border: "#0f172a", bar: "#4CA05F", barOther: "#7c8aa0", heat: ["#0E1F2E", "#1F4630", "#356B3F", "#5B8F68"] };
+            KPI_HEX = { "全部": "#A5B4C5", "进行中": "#7FB3A0", "已笔试": "#A8C686", "面试推进": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8", "待投递": "#5FC7B4" };
+            STATUS_HEX = { "已投递": "#7FB3A0", "已笔试": "#A8C686", "已一面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8" };
+        }
+        TIP.backgroundColor = CHT.tipBg;
+        TIP.borderColor = CHT.tipBorder;
+        TIP.textStyle.color = CHT.label;
+    }
+    const SUN_SVG = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+    const MOON_SVG = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    function updateThemeUI(t) {
+        const light = t === "light";
+        $("theme-icon").innerHTML = light ? MOON_SVG : SUN_SVG;
+        $("theme-icon-m").innerHTML = light ? MOON_SVG : SUN_SVG;
+        $("theme-label").textContent = light ? "夜间模式" : "白天模式";
+    }
+    function setTheme(t) {
+        document.body.classList.toggle("light", t === "light");
+        updateThemeUI(t);
+        refreshChartTheme();
+        try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+        renderKpis();
+        renderCharts();
+        renderTable();
+        renderTimeline();
+        renderInterviewAll();
+        charts.forEach(c => { try { c.resize(); } catch (e) {} });
+    }
+
+let charts = [];
+    const HEAT_MONTHS = [];
+    let heatMonthIdx = 0;
+    let heatChart = null;
+
+    function buildHeat() {
+        const cur = HEAT_MONTHS[heatMonthIdx];
+        if (!cur) { return; }
+        $("heat-month-label").textContent = cur.slice(0, 4) + "-" + cur.slice(5, 7);
+        $("btn-heat-prev").disabled = heatMonthIdx === 0;
+        $("btn-heat-next").disabled = heatMonthIdx === HEAT_MONTHS.length - 1;
+        const dayCount = {};
+        APPLICATIONS.forEach(a => { if (a.applyTime && a.applyTime.slice(0, 7) === cur) { const d = a.applyTime.slice(0, 10); dayCount[d] = (dayCount[d] || 0) + 1; } });
+        const lastDay = new Date(Number(cur.slice(0, 4)), Number(cur.slice(5, 7)), 0).getDate();
+        const data = [];
+        for (let d = 1; d <= lastDay; d++) { const ds = cur + "-" + String(d).padStart(2, "0"); data.push([ds, dayCount[ds] || 0]); }
+        const hMax = Math.max(...data.map(x => x[1]), 1);
+        if (heatChart) { const i = charts.indexOf(heatChart); if (i >= 0) charts.splice(i, 1); try { heatChart.dispose(); } catch (e) {} }
+        heatChart = echarts.init($("chart-month"));
+        charts.push(heatChart);
+        heatChart.setOption({
+            tooltip: Object.assign({}, TIP, { trigger: "item", formatter: p => p.value[0] + "：" + p.value[1] + " 次投递" }),
+            calendar: {
+                top: 8, left: 14, right: 12, bottom: 4,
+                range: [cur + "-01", cur + "-" + lastDay],
+                cellSize: ["auto", "auto"],
+                splitLine: { show: false },
+                itemStyle: { borderColor: CHT.border, borderWidth: 1, borderRadius: 3 },
+                dayLabel: { show: true, firstDay: 1, nameMap: ["日", "一", "二", "三", "四", "五", "六"], color: CHT.axis, fontSize: 10, margin: 4 },
+                monthLabel: { show: false },
+                yearLabel: { show: false }
+            },
+            visualMap: { min: 0, max: hMax, show: false, calculable: false, inRange: { color: CHT.heat } },
+            series: [{
+                type: "heatmap", coordinateSystem: "calendar", data: data,
+                label: { show: true, color: CHT.label, fontSize: 10, fontWeight: 600, formatter: p => { if (!p.value[1]) return ""; const d = p.value[0]; return Number(d.slice(5, 7)) + "/" + Number(d.slice(8, 10)); } },
+                itemStyle: { borderColor: CHT.border, borderWidth: 1 }
+            }]
+        });
+    }
+
+    function renderCharts() {
+        charts.forEach(c => { try { c.dispose(); } catch (e) {} });
+        charts = [];
+        heatChart = null;
+
+        HEAT_MONTHS.length = 0;
+        APPLICATIONS.forEach(a => { if (a.applyTime) { const m = a.applyTime.slice(0, 7); if (!HEAT_MONTHS.includes(m)) HEAT_MONTHS.push(m); } });
+        HEAT_MONTHS.sort();
+        if (heatMonthIdx >= HEAT_MONTHS.length) heatMonthIdx = Math.max(0, HEAT_MONTHS.length - 1);
+        if (heatMonthIdx < 0) heatMonthIdx = 0;
+
+        const by = {};
+        APPLICATIONS.forEach(a => { by[a.status] = (by[a.status] || 0) + 1; });
+        const stData = STATUS_ORDER.map(s => ({ name: s, value: by[s] || 0 })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+        const c1 = echarts.init($("chart-status"));
+        const pieTotal = stData.reduce((s, d) => s + d.value, 0);
+        c1.setOption({
+            tooltip: Object.assign({}, TIP, {
+                trigger: "item",
+                formatter: p => p.name + "：" + p.value + " 条（" + (pieTotal ? Math.round(p.value / pieTotal * 100) : 0) + "%）"
+            }),
+            legend: { show: false },
+            series: [{
+                type: "pie", radius: "62%", center: ["50%", "48%"],
+                data: stData.map(d => ({ name: d.name, value: d.value, itemStyle: { color: STATUS_HEX[d.name] } })),
+                itemStyle: { borderColor: CHT.border, borderWidth: 2 },
+                label: { show: true, color: CHT.label, fontSize: 12, fontWeight: 600, formatter: "{b} {c}" },
+                labelLine: { length: 12, length2: 10, lineStyle: { color: CHT.line } },
+                cursor: "pointer", avoidLabelOverlap: true
+            }]
+        });
+        c1.on("click", p => { if (p.name && FILTER_MAP[p.name]) setFilter(p.name); });
+        charts.push(c1);
+
+        buildHeat();
+
+        const tagCount = {};
+        APPLICATIONS.forEach(a => a.nature.forEach(n => { tagCount[n] = (tagCount[n] || 0) + 1; }));
+        const tags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+        let top = tags.slice(0, 6);
+        const rest = tags.slice(6).reduce((s, t) => s + t[1], 0);
+        if (rest > 0) top.push(["其他", rest]);
+        top.reverse();
+        const c3 = echarts.init($("chart-nature"));
+        c3.setOption({
+            grid: { left: 6, right: 30, top: 6, bottom: 4, containLabel: true },
+            tooltip: Object.assign({}, TIP, { trigger: "item" }),
+            xAxis: { type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: CHT.grid } }, axisLabel: { color: CHT.axis, fontSize: 11 } },
+            yAxis: { type: "category", data: top.map(t => t[0]), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: CHT.sub, fontSize: 12 } },
+            series: [{
+                type: "bar", data: top.map((t, i) => ({ value: t[1], itemStyle: { color: i === top.length - 1 ? CHT.barOther : CHT.bar, borderRadius: [0, 4, 4, 0] } })),
+                barWidth: 13, label: { show: true, position: "right", color: CHT.label, fontSize: 12, fontWeight: 600 }
+            }]
+        });
+        charts.push(c3);
+    }
+
+    // ===== 明细表 =====
+    function filterRows() {
+        const set = FILTER_MAP[state.filterKey] || null;
+        const q = state.q.trim().toLowerCase();
+        return APPLICATIONS.filter(a => {
+            if (set && !set.includes(a.status)) return false;
+            if (q) {
+                const hay = (a.company + " " + a.role + " " + (a.base || []).join(" ")).toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        }).sort((x, y) => (y.applyTime || "").localeCompare(x.applyTime || ""));
+    }
+    function timelineInner(app) {
+        if (!app.timeline) {
+            return '<p class="text-xs text-slate-600">暂无进度记录，投递于 ' + escapeHtml(app.applyTime || "未知") + "。</p>";
+        }
+        const lines = app.timeline.split("\n").filter(Boolean);
+        return '<div class="tl">' + lines.map((ln, i) => {
+            const m = ln.match(/^([0-9]{1,2}[.\-][0-9]{1,2}[\s\-]?[^\s]*)\s*(.*)$/);
+            const date = m ? m[1].trim() : "";
+            const text = m ? (m[2] || ln) : ln;
+            return `<div class="tl-item ${i === lines.length - 1 ? "pending" : ""}">
+                <span class="tl-dot"></span>
+                <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                    ${date ? '<span class="tl-date num">' + escapeHtml(date) + "</span>" : ""}
+                    <span class="text-[13px] text-slate-200">${escapeHtml(text)}</span>
+                </div>
+            </div>`;
+        }).join("") + "</div>";
+    }
+    function renderTable() {
+        const rows = filterRows();
+        $("result-count").textContent = "共 " + rows.length + " 条";
+        $("table-body").innerHTML = rows.map((a, i) => {
+            const rid = "r" + i;
+            const open = state.expanded.has(rid);
+            const detail = `
+                <div class="flex flex-col gap-3">
+                    <div>${timelineInner(a)}</div>
+                    ${a.remark ? '<p class="text-xs text-slate-400 leading-relaxed"><span class="text-slate-500">备注：</span>' + remarkHtml(a.remark) + "</p>" : ""}
+                    <div class="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-700/50">
+                        ${a.link ? '<a href="' + escapeHtml(a.link) + '" target="_blank" rel="noopener" class="icon-btn">查看投递链接 ↗</a>' : ""}
+                        <button class="icon-btn act-update" data-id="${a.id}">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 1 1 13 4"/><path d="M21 4v6h-6"/></svg>更新进度
+                        </button>
+                        <button class="icon-btn act-edit" data-id="${a.id}">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>编辑
+                        </button>
+                        <button class="icon-btn act-del !text-red-400 !border-red-400/30 hover:!bg-red-500/10" data-id="${a.id}">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>删除
+                        </button>
+                        <span class="text-xs text-slate-600 ml-auto num">投递 ${escapeHtml(shortDate(a.applyTime)) || "—"} · 进度 ${escapeHtml(shortDate(a.latestDate)) || "—"}</span>
+                    </div>
+                </div>`;
+            return `
+                <tr class="row" data-rid="${rid}">
+                    <td class="font-semibold text-slate-100">${escapeHtml(a.company)}</td>
+                    <td class="text-slate-300">${escapeHtml(a.role)}</td>
+                    <td class="text-slate-400">${chips(a.base) || '<span class="text-slate-600">—</span>'}</td>
+                    <td>${fmtMoney(a.salary)}</td>
+                    <td>${statusBadge(a.status)}</td>
+                    <td class="num text-slate-400">${escapeHtml(shortDate(a.applyTime)) || '<span class="text-slate-600">—</span>'}</td>
+                    <td class="num text-slate-400">${escapeHtml(shortDate(a.latestDate)) || '<span class="text-slate-600">—</span>'}</td>
+                    <td>
+                        <div class="flex gap-1.5">
+                            <button class="icon-btn act-update !px-2" data-id="${a.id}" title="更新进度">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 1 1 13 4"/><path d="M21 4v6h-6"/></svg>
+                            </button>
+                            <button class="icon-btn act-edit !px-2" data-id="${a.id}" title="编辑">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            </button>
+                            <button class="icon-btn act-del !px-2 !text-red-400 !border-red-400/30 hover:!bg-red-500/10" data-id="${a.id}" title="删除">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="detail hidden-v" data-detail="${rid}"><td colspan="8">${detail}</td></tr>`;
+        }).join("") || '<tr class="empty"><td colspan="8">没有匹配的投递记录，试试「新增投递」</td></tr>';
+
+        bindTableEvents();
+    }
+    function bindTableEvents() {
+        $("table-body").querySelectorAll("tr.row").forEach(tr => {
+            tr.addEventListener("click", (e) => {
+                if (e.target.closest(".icon-btn")) return; // 点操作按钮不展开
+                const rid = tr.dataset.rid;
+                if (state.expanded.has(rid)) state.expanded.delete(rid);
+                else state.expanded.add(rid);
+                const d = $("table-body").querySelector('tr[data-detail="' + rid + '"]');
+                if (d) d.classList.toggle("hidden-v");
+                tr.classList.toggle("bg-slate-800/40");
+            });
+        });
+        $("table-body").querySelectorAll(".act-update").forEach(b => b.addEventListener("click", () => openModal("update", b.dataset.id)));
+        $("table-body").querySelectorAll(".act-edit").forEach(b => b.addEventListener("click", () => openModal("edit", b.dataset.id)));
+        $("table-body").querySelectorAll(".act-del").forEach(b => b.addEventListener("click", () => removeApp(b.dataset.id)));
+    }
+    function setFilter(key) {
+        state.filterKey = key;
+        $("status-filter").value = key;
+        renderKpis();
+        renderTable();
+    }
+
+    // ===== 进度时间轴视图 =====
+    function renderTimeline() {
+        const items = APPLICATIONS
+            .filter(a => a.latestDate)
+            .sort((x, y) => y.latestDate.localeCompare(x.latestDate));
+        $("tl-count").textContent = items.length + " 条有进度更新";
+        $("timeline-body").innerHTML = items.map(a => {
+            const lines = (a.timeline || "").split("\n").filter(Boolean);
+            const last = lines[lines.length - 1] || "";
+            const m = last.match(/^[0-9]{1,2}[.\-][0-9]{1,2}[\s\-]?[^\s]*\s*(.*)$/);
+            const summary = m ? m[1].trim() : last;
+            return `
+                <div class="ptl-item">
+                    <span class="ptl-dot"></span>
+                    <div class="flex items-start justify-between gap-3 flex-wrap">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="num text-xs text-slate-500 font-medium">${escapeHtml(shortDate(a.latestDate))}</span>
+                                <span class="text-sm font-semibold text-slate-100">${escapeHtml(a.company)}</span>
+                                ${statusBadge(a.status)}
+                            </div>
+                            <p class="text-[13px] text-slate-400 mt-1">${escapeHtml(a.role)}</p>
+                            ${summary ? '<p class="text-xs text-slate-500 mt-1.5">最新动态：' + escapeHtml(summary) + "</p>" : ""}
+                        </div>
+                        ${a.base && a.base.length ? '<div class="shrink-0">' + chips(a.base) + "</div>" : ""}
+                    </div>
+                </div>`;
+        }).join("") || '<p class="text-sm text-slate-500 py-10 text-center">暂无有进度更新的投递</p>';
+    }
+
+    // ===== 投递日历 =====
+    let CAL_YEAR = 0, CAL_MONTH = 0;
+    function calReset() { const n = new Date(); CAL_YEAR = n.getFullYear(); CAL_MONTH = n.getMonth(); }
+    calReset();
+    function calShift(dm) {
+        let m = CAL_MONTH + dm, y = CAL_YEAR;
+        while (m < 0) { m += 12; y--; }
+        while (m > 11) { m -= 12; y++; }
+        CAL_YEAR = y; CAL_MONTH = m;
+        renderCalendar();
+    }
+    function renderCalendar() {
+        $("cal-month-label").textContent = CAL_YEAR + "年" + (CAL_MONTH + 1) + "月";
+        const first = new Date(CAL_YEAR, CAL_MONTH, 1);
+        const days = new Date(CAL_YEAR, CAL_MONTH + 1, 0).getDate();
+        const prevDays = new Date(CAL_YEAR, CAL_MONTH, 0).getDate();
+        const offset = (first.getDay() + 6) % 7; // 周一起始
+        const byD = {};
+        APPLICATIONS.forEach(a => { if (a.deadline) { (byD[a.deadline] = byD[a.deadline] || []).push({ src: "app", id: a.id, name: a.company, role: a.role }); } });
+        loadPending();
+        PENDING.items.forEach(p => { if (p.deadline) { (byD[p.deadline] = byD[p.deadline] || []).push({ src: "pending", id: p.id, name: p.name, role: p.role }); } });
+        const pad = n => String(n).padStart(2, "0");
+        const dateStr = (y, m, d) => y + "-" + pad(m + 1) + "-" + pad(d);
+        const todayStr = today();
+        const cells = [];
+        const hd = ["一", "二", "三", "四", "五", "六", "日"].map(d => '<div class="cal-hd">' + d + "</div>").join("");
+        for (let i = 0; i < offset; i++) {
+            const d = prevDays - offset + 1 + i;
+            const y = CAL_MONTH === 0 ? CAL_YEAR - 1 : CAL_YEAR;
+            const m = CAL_MONTH === 0 ? 11 : CAL_MONTH - 1;
+            const ds = dateStr(y, m, d);
+            cells.push(calCell(ds, d, byD[ds] || [], false, todayStr));
+        }
+        for (let d = 1; d <= days; d++) {
+            const ds = dateStr(CAL_YEAR, CAL_MONTH, d);
+            cells.push(calCell(ds, d, byD[ds] || [], true, todayStr));
+        }
+        const need = 42 - cells.length;
+        for (let i = 0; i < need; i++) {
+            const d = i + 1;
+            const y = CAL_MONTH === 11 ? CAL_YEAR + 1 : CAL_YEAR;
+            const m = CAL_MONTH === 11 ? 0 : CAL_MONTH + 1;
+            const ds = dateStr(y, m, d);
+            cells.push(calCell(ds, d, byD[ds] || [], false, todayStr));
+        }
+        $("cal-grid").innerHTML = hd + cells.join("");
+        $("cal-grid").querySelectorAll(".cal-item").forEach(el => {
+            el.addEventListener("click", () => {
+                if (el.dataset.src === "pending") openPModal(Number(el.dataset.id));
+                else openModal("edit", el.dataset.id);
+            });
+        });
+        renderCalList(byD, todayStr);
+    }
+    function calCell(ds, d, items, inMonth, todayStr) {
+        const dead = items.length > 0;
+        const cls = ["cal-cell", inMonth ? "" : "out", ds === todayStr ? "today" : "", dead ? "has-dd" : ""].filter(Boolean).join(" ");
+        const its = items.slice(0, 2).map(a =>
+            '<button class="cal-item' + (ds < todayStr ? " dead" : "") + '" data-id="' + a.id + '" data-src="' + a.src + '" title="' + escapeHtml(a.name) + (a.role ? " · " + escapeHtml(a.role) : "") + '">' + escapeHtml(a.name) + "</button>"
+        ).join("");
+        const more = items.length > 2 ? '<span class="cal-more">+' + (items.length - 2) + "</span>" : "";
+        return '<div class="' + cls + '"><span class="cal-day' + (ds < todayStr && dead ? " dead" : "") + '">' + d + '</span><div class="flex flex-col gap-1 overflow-hidden">' + its + more + "</div></div>";
+    }
+    function renderCalList(byD, todayStr) {
+        const list = [];
+        Object.keys(byD).forEach(ds => byD[ds].forEach(a => list.push({ ds: ds, a: a })));
+        list.sort((x, y) => (x.ds < y.ds ? -1 : x.ds > y.ds ? 1 : 0));
+        const wrap = $("cal-list");
+        let html = "";
+        if (list.length) {
+            html = list.map(({ ds, a }) => {
+                const daysLeft = Math.round((new Date(ds) - new Date(todayStr)) / 86400000);
+                const cls = daysLeft < 0 ? "over" : daysLeft <= 7 ? "soon" : "ok";
+                const badge = daysLeft < 0 ? "已过期" : daysLeft === 0 ? "今天截止" : daysLeft + " 天后";
+                const md = Number(ds.slice(5, 7)) + "月" + Number(ds.slice(8, 10)) + "日";
+                return calRowHTML(md, a, '<span class="cal-badge ' + cls + '">' + badge + "</span>");
+            }).join("");
+        } else {
+            html = '<p class="text-sm text-slate-500 py-6 text-center">还没有截止日期记录——给下面的投递补填「截止日期」，就会按日期出现在日历上。</p>';
+        }
+        const withoutApp = APPLICATIONS.filter(a => !a.deadline).sort((x, y) => (x.company < y.company ? -1 : x.company > y.company ? 1 : 0));
+        if (withoutApp.length) {
+            html += '<div class="text-xs font-semibold text-slate-400 pt-4 pb-2">投递总览 · 未填截止日期（' + withoutApp.length + "）</div>";
+            html += withoutApp.map(a => calRowHTML("未填", { src: "app", id: a.id, name: a.company, role: a.role }, '<span class="cal-badge gray">去填写</span>')).join("");
+        }
+        const withoutPending = PENDING.items.filter(p => !p.deadline).sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+        if (withoutPending.length) {
+            html += '<details open class="cal-details"><summary>待投递池 · 未填截止日期（' + withoutPending.length + "）</summary><div class=\"pt-2\">";
+            html += withoutPending.map(p => calRowHTML("未填", { src: "pending", id: p.id, name: p.name, role: p.role }, '<span class="cal-badge gray">去填写</span>')).join("");
+            html += "</div></details>";
+        }
+        wrap.innerHTML = html;
+        wrap.querySelectorAll(".cal-row").forEach(el => el.addEventListener("click", () => {
+            if (el.dataset.src === "pending") openPModal(Number(el.dataset.id));
+            else openModal("edit", el.dataset.id);
+        }));
+    }
+    function calRowHTML(md, a, badgeHtml) {
+        return '<button class="cal-row" data-id="' + a.id + '" data-src="' + a.src + '">' +
+            '<span class="d num">' + md + '</span>' +
+            '<span class="co"><span class="n">' + escapeHtml(a.name) + '</span>' + (a.role ? '<span class="r"> · ' + escapeHtml(a.role) + "</span>" : "") + "</span>" +
+            badgeHtml + "</button>";
+    }
+
+    // ===== 视图切换 =====
+    function switchView(view) {
+        state.view = view;
+        document.querySelectorAll(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.view === view));
+        $("view-overview").classList.toggle("hidden-v", view !== "overview");
+        $("view-timeline").classList.toggle("hidden-v", view !== "timeline");
+        $("view-interview").classList.toggle("hidden-v", view !== "interview");
+        $("view-pending").classList.toggle("hidden-v", view !== "pending");
+        $("view-calendar").classList.toggle("hidden-v", view !== "calendar");
+        if (view === "interview") renderInterviewAll();
+        if (view === "pending") renderPending();
+        if (view === "calendar") renderCalendar();
+        if (view === "overview") renderKpis();
+        charts.forEach(c => c.resize());
+    }
+
+    // ===== 编辑弹窗 =====
+    const modal = $("modal");
+    const form = $("app-form");
+    function openModal(mode, idx) {
+        state.mode = mode;
+        state.editingIdx = idx;
+        $("modal-title").textContent = mode === "add" ? "新增投递" : (mode === "update" ? "更新进度" : "编辑投递");
+        form.reset();
+        if (mode !== "add") {
+            const a = APPLICATIONS.find(x => x.id === idx);
+            form.company.value = a.company || "";
+            form.role.value = a.role || "";
+            form.status.value = a.status || "已投递";
+            form.base.value = (a.base || []).join(",");
+            form.salary.value = a.salary || "";
+            form.link.value = a.link || "";
+            form.applyTime.value = a.applyTime || "";
+            form.latestDate.value = a.latestDate || "";
+            form.deadline.value = a.deadline || "";
+            form.nature.value = (a.nature || []).join(",");
+            form.timeline.value = a.timeline || "";
+            form.remark.value = a.remark || "";
+            if (mode === "update") {
+                // 更新进度：默认把状态推进一档，时间线聚焦在末尾
+                const st = a.status;
+                const next = st === "已投递" ? "已笔试" : st === "已笔试" ? "已一面" : st === "已一面" ? "面试中" : st === "面试中" ? "已拿Offer" : st;
+                form.status.value = next;
+                if (!form.latestDate.value) form.latestDate.value = today();
+            }
+        }
+        modal.classList.remove("hidden-v");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => { const f = form.elements.company || form.elements.role; if (f) f.focus(); }, 60);
+    }
+    function closeModal() {
+        modal.classList.add("hidden-v");
+        document.body.style.overflow = "";
+    }
+    function collectForm() {
+        const v = name => (form.elements[name].value || "").trim();
+        const list = name => v(name).split(/[,，]/).map(s => s.trim()).filter(Boolean);
+        return {
+            company: v("company"), role: v("role"),
+            status: v("status") || "已投递",
+            base: list("base"), nature: list("nature"),
+            salary: v("salary"), link: v("link"),
+            applyTime: v("applyTime"), latestDate: v("latestDate"), deadline: v("deadline"),
+            timeline: v("timeline"), remark: v("remark")
+        };
+    }
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const app = collectForm();
+        if (!app.company || !app.role) { toast("公司名称和岗位不能为空"); return; }
+        if (state.mode === "add") {
+            APPLICATIONS.push(Object.assign({ id: uid("a") }, app));
+            toast("已新增「" + app.company + "」");
+        } else {
+            const i = APPLICATIONS.findIndex(x => x.id === state.editingIdx);
+            if (i < 0) { toast("未找到该记录"); return; }
+            app.id = APPLICATIONS[i].id;
+            APPLICATIONS[i] = app;
+            toast("已保存「" + app.company + "」");
+        }
+        saveData();
+        closeModal();
+        refreshAll();
+    });
+    function removeApp(id) {
+        const a = APPLICATIONS.find(x => x.id === id);
+        if (!a) return;
+        if (!confirm("确定删除「" + a.company + " - " + a.role + "」这条投递记录吗？")) return;
+        APPLICATIONS = APPLICATIONS.filter(x => x.id !== id);
+        saveData();
+        state.expanded.clear();
+        toast("已删除");
+        refreshAll();
+    }
+    function refreshAll() {
+        renderKpis();
+        renderCharts();
+        renderTable();
+        renderTimeline();
+        if (state.view === "calendar") renderCalendar();
+    }
+
+    // ===== 导出 / 重置 =====
+    function exportData() {
+        const blob = new Blob([JSON.stringify(APPLICATIONS, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "投递追踪数据-" + today() + ".json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast("已导出 " + APPLICATIONS.length + " 条数据");
+    }
+    function resetData() {
+        if (!confirm("将清空本机数据并恢复为初始 41 条记录（来自飞书表格），确定吗？")) return;
+        try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+        APPLICATIONS = JSON.parse(JSON.stringify(SEED_DATA));
+        ensureApplyIds();
+        state.expanded.clear();
+        refreshAll();
+        toast("已恢复初始数据");
+    }
+
+    // ===== 面试题库 =====
+    const INTERVIEW_KEY = "interview-tracker-v1";
+    const INTERVIEW_SEED = {"version":4,"modules":[{"name":"基础动机认知","pct":19},{"name":"行为STAR","pct":19},{"name":"自我特质","pct":12},{"name":"岗位专业场景","pct":23},{"name":"压力陷阱","pct":10},{"name":"反问面试官","pct":17}],"plan":[{"name":"基础动机认知","done":false},{"name":"行为STAR","done":false},{"name":"自我特质","done":false},{"name":"岗位专业场景","done":false},{"name":"压力陷阱","done":false},{"name":"反问面试官","done":false}],"questions":[{"cat":"基础动机认知","title":"自我介绍","answer":"（60—90秒标准版｜供应链、采购方向）\n您好，我叫贾桐，目前在华威大学攻读粮食安全硕士，预计2026年12月毕业。本科是北京农学院与英国哈珀亚当斯大学的中外合作培养经历，学习内容覆盖食品科学、食品质量和零售管理。\n我认为自己与供应链岗位比较相关的经历，主要有两方面。一方面，我接触过食品供应链的实际运营。在农业企业实习时，我参与了出入库、冷库和农事记录整理，也通过课程分析过咖啡的端到端供应链及零售商与供应商合作。另一方面，我具备数据整理和分析经验。硕士研究中，我使用R整合商业小麦调查数据与品种抗病评分，完成数据清理、匹配和统计分析。\n这些经历让我希望从供应链或采购岗位开始，把食品行业知识和数据分析用于实际的库存、交付及供应商管理，也逐步积累跨部门协作与业务判断能力。\n\n（30秒精简版）\n您好，我叫贾桐，是华威大学粮食安全硕士，本科具有食品科学、食品质量与零售管理背景。我在农业企业接触过出入库和冷库记录，也做过供应链案例分析及使用R的农业数据研究。我希望把食品行业理解、数据处理和协调能力用于供应链或采购工作，逐步成长为能够独立负责业务模块的人。","lang":"zh","id":1,"done":false},{"cat":"基础动机认知","title":"为什么选择我们公司？","answer":"我选择贵公司，主要看重业务与我背景的连接，以及这个岗位能让我积累的实际能力。\n我学习过食品科学、零售管理和粮食安全，也接触过农业生产记录、供应链分析和消费者研究，因此希望进入能够把这些知识用于实际业务的企业。相比只完成单一分析任务，我更希望了解分析结果怎样影响采购、交付或产品决策。\n这次投递也是经过方向筛选的。我希望从岗位的基础工作开始，逐步理解产品和业务流程，并承担更完整的任务。","lang":"zh","id":2,"done":false},{"cat":"基础动机认知","title":"为什么投递这个岗位？","answer":"（供应链／采购版）\n这个岗位需要同时理解产品、数据和不同环节的协作，与我的经历连接比较直接。本科采购与供应链课程给了我基础，农业企业实习让我接触实际运营记录，硕士研究则加强了数据处理能力。我希望进一步学习怎样在质量、成本、库存和交付之间作出判断，所以把这个方向作为重点。\n\n（农业数据／行业研究版）\n我希望继续使用自己在农业研究中积累的能力，同时让研究与实际业务决策联系得更紧密。我做过商业小麦数据研究、气候风险分析和农药使用趋势分析，比较熟悉农业问题涉及的数据口径和解释限制。我希望从资料搜集、数据整理和专题分析开始，逐步形成对行业的持续判断。\n\n（消费者洞察版）\n本科中英宠物食品研究让我对消费者为什么作出不同选择产生了兴趣。我也接触过问卷、产品开发和感官评价，希望进一步学习如何把消费者反馈转化为产品定位、品类选择和市场沟通建议。这个岗位能让我继续使用研究方法，同时补充实际商业经验。","lang":"zh","id":3,"done":false},{"cat":"基础动机认知","title":"你理解这个岗位是做什么的？","answer":"（供应链／采购版）\n我理解供应链的核心，是在满足质量和服务要求的前提下，让产品按照需要的数量和时间到达相应环节，同时控制整体成本与风险。\n采购更侧重需求确认、供应商选择、商务条件、交付和供应表现管理。它需要考虑采购价格，也要理解质量、起订量、运输、库存和供应稳定性带来的影响，并与质量、生产、计划等团队保持沟通。\n\n（农业行研版）\n我理解行业研究需要把分散的信息整理成能够支持判断的结论。具体包括明确问题、搜集和核对资料、分析供需及成本变化、解释主要驱动因素，再说明对业务意味着什么，以及哪些判断还需要继续验证。\n\n（消费者洞察版）\n我理解消费者洞察需要解释消费者的需求、行为和选择原因，再帮助业务作出决策。除了开展调研，还要判断样本和方法是否合适，把发现与产品、价格、渠道或沟通问题连接起来，并验证建议是否有效。","lang":"zh","id":4,"done":false},{"cat":"基础动机认知","title":"你的职业规划是什么？","answer":"入职初期，我希望先掌握产品、业务流程和核心数据，把基础分析、记录核查和任务跟进做好，达到可以独立完成日常工作的程度。\n积累经验后，我希望能够负责一个相对完整的模块，例如一个品类、供应商或研究课题，理解自己的工作怎样影响其他环节。\n长期来看，我希望成为既理解食品与农业行业，也能用数据支持业务判断的人。具体走向会结合岗位实践调整，但行业积累和独立解决问题的能力是我希望持续发展的。","lang":"zh","id":5,"done":false},{"cat":"基础动机认知","title":"求职时最看重什么？","answer":"我最看重工作内容和成长空间，也会认真考虑薪酬与工作地点。\n对第一份正式工作，我希望能够接触实际业务，有明确的任务、反馈和逐步承担责任的机会。平台规模是参考，但我也会关注自己具体做什么、能够积累什么能力。\n薪酬同样是重要因素，我会结合城市生活成本、整体年包和后续发展综合判断。","lang":"zh","id":6,"done":false},{"cat":"基础动机认知","title":"为什么从原来的学习方向转到供应链或农业行研？","answer":"我认为这是对已有学习经历的延伸。\n本科除了食品科学，也包含零售采购、供应链和物流课程；硕士粮食安全则让我进一步理解农业生产、资源环境和供应风险。实习与研究过程中，我发现自己比较希望处理信息、分析问题，并理解不同环节之间的联系。\n所以我希望把专业知识用于供应链或农业研究岗位，让分析能够支持实际决策。","lang":"zh","id":7,"done":false},{"cat":"基础动机认知","title":"能接受出差、轮岗、加班和外派吗？","answer":"我可以接受出差、与岗位发展相关的轮岗，也愿意考虑国内外派及海外派驻。\n业务高峰或紧急任务需要加班时，我可以配合，也会通过提前安排和及时沟通保证交付。对于长期性的安排，我希望了解具体地点、周期、工作内容和后续发展路径，确保自己能够稳定投入。","lang":"zh","id":8,"done":false},{"cat":"基础动机认知","title":"意向城市有哪些？能接受调剂吗？","answer":"我优先考虑经济较发达、公共交通便利的一线和新一线城市，但全国范围内与发展方向匹配的机会，我都愿意了解。\n我可以讨论地点调剂，主要会结合具体职责、培养安排和长期定岗地点判断。如果需要前往生产或仓储基地轮岗，我也希望了解周期和之后的岗位安排。","lang":"zh","id":9,"done":false},{"cat":"基础动机认知","title":"什么时候可以入职？","answer":"我预计2026年12月毕业，目前计划2027年1月起到岗。具体可以根据毕业手续和公司的入职安排提前沟通。","lang":"zh","id":10,"done":false},{"cat":"行为STAR","title":"讲一件最有成就感的经历","answer":"比较有成就感的是硕士小麦研究，因为它要求我把多来源数据整理成可以分析和解释的研究结果。\n研究需要连接商业田间调查与AHDB品种抗病评分，不能直接把表格合并后就开始建模。我使用R处理品种名称、评分匹配、缺失值和重复记录，并检查不同分析所需的样本范围。\n对我来说，收获最大的是能够解释每一步处理的依据。例如，数据里的杀菌剂产品条目数不能直接理解成喷药次数，这会影响整个研究结论的表述。\n这个项目让我更有信心面对复杂数据，也让我形成了先检查数据含义、再开展分析的习惯。","lang":"zh","id":11,"done":false},{"cat":"行为STAR","title":"说一次遇到很大困难、最后解决的经历","answer":"硕士研究中的一个难点，是让不同来源的数据能够正确连接。\n田间调查与品种评分的名称和年份需要对应，如果匹配不准确，后面的模型即使运行成功，结果也可能存在问题。\n我的处理方式是先统一品种名称，再进行评分匹配，并检查未匹配记录、重复键和年份覆盖情况。对于无法直接确认的内容，需要回到来源核对，而不能为了提高匹配率直接合并。\n通过这些处理，项目能够继续进入统计分析。这个经历让我认识到，复杂问题需要先拆清楚，尤其要优先处理会影响后续所有步骤的基础问题。","lang":"zh","id":12,"done":false},{"cat":"行为STAR","title":"讲一次主动发现问题并改进的经历","answer":"土豆饼干产品开发项目中，第一轮问卷的女性受访者大约占80%。这个结构提醒我们，不能直接把结果当成目标消费者整体的偏好。\n项目随后开展了第二轮调研。我从这个过程中学到，产品研究除了看答案本身，也要检查是谁回答了问题、招募方式有没有影响结果。\n如果将调研用于商业决策，我会先确认目标消费者，再检查样本覆盖情况，并把研究限制一起说明。追加问卷有助于补充信息，但还需要重新判断是否改善了原来的问题。","lang":"zh","id":13,"done":false},{"cat":"行为STAR","title":"和团队成员意见不一致，怎么说服对方？","answer":"我会先确认分歧来自哪里，是目标不同、信息不同，还是对风险的判断不同。\n例如在供应链分析中，有人可能更关注成本，有人更关注交付稳定性。我会把共同目标和必须满足的条件先说明白，再比较不同方案的依据、成本和影响。如果可以用数据或小范围验证解决，就尽量避免停留在个人偏好上。\n如果最后选择了对方的方案，我也会支持共同决定，并把需要观察的风险和后续验证方式明确下来。","lang":"zh","id":14,"done":false},{"cat":"行为STAR","title":"时间紧、多任务并行，怎么安排？","answer":"我会先列出每项任务的截止时间、交付要求和依赖关系，再决定顺序。\n通常优先处理会影响别人进度、需要等待反馈，或者后期修改成本较高的任务。对于较大的任务，我会拆成可以检查的小产出，避免一直做到最后才发现方向有问题。\n如果判断无法同时按原要求完成，我会提前沟通调整范围或时间，并说明已经完成什么、还缺什么，以及建议怎样安排。","lang":"zh","id":15,"done":false},{"cat":"行为STAR","title":"团队目标可能完不成，你做什么？","answer":"我会先判断问题是工作量过大、任务不清、某个环节卡住，还是成员之间缺少衔接。\n明确原因后，先保证核心交付，把任务拆到具体负责人和时间点。如果某个成员遇到困难，我会先了解原因，再讨论提供支持或调整分工。\n临近截止时间时，我会优先确保必要内容完成，同时给整体核查留时间。如果确实存在无法解决的风险，会尽早向相关负责人说明，并提出可以执行的替代方案。","lang":"zh","id":16,"done":false},{"cat":"行为STAR","title":"讲一次学习陌生技能或工具的经历","answer":"硕士研究中，我需要使用R完成农业数据处理和统计分析。\n我围绕研究任务使用相应功能，包括导入数据、统一名称、跨表匹配、汇总和回归分析。对我来说，关键是能解释代码做了什么，以及输出是否符合研究问题。\n例如，合并数据后需要检查记录数和匹配结果，建模前需要确认变量定义和缺失情况。通过这个项目，我逐步形成了一套可以重复运行的数据处理流程，也更理解了工具学习需要与结果核查结合。","lang":"zh","id":17,"done":false},{"cat":"行为STAR","title":"讲一次结果不如预期的经历，反思是什么？","answer":"本科宠物食品研究让我认识到，完成调研与获得足够有代表性的信息之间，还有距离。\n研究最终有82份有效样本，其中中国46份、英国36份，采用便利抽样。它能够帮助我比较受访者的回答，但对推广到两国整体消费者存在限制。\n我的反思是，研究设计初期就需要把目标人群、招募渠道和样本覆盖考虑得更具体。以后开展类似研究，我会更早评估样本获取的可行性，并根据研究目的决定哪些比较可以做、哪些结论需要保留。","lang":"zh","id":18,"done":false},{"cat":"行为STAR","title":"讲一个领导小组或推进项目的例子","answer":"蕨麻研究项目中，我承担了统筹规划、报告整合和对外联系的一部分工作。\n项目既需要整理文献，也希望与地方需求建立联系。我参与联系当地村官，同时负责summary和conclusion，并对初稿进行修改和格式统一。\n在这个过程中，我需要关注各部分是否围绕同一个问题，结论是否得到前文支持，以及地方需求与文献分析之间能否连接。我的作用主要是把分散内容整合成逻辑一致的报告，推动项目形成完整输出。","lang":"zh","id":19,"done":false},{"cat":"行为STAR","title":"别人否定你的方案，你怎么处理？","answer":"我会先确认对方否定的是目标、依据，还是执行方式，并请对方具体说明顾虑。\n如果是我遗漏了条件，就及时调整；如果双方掌握的信息不同，我会把自己的依据说明清楚，再一起比较。对于暂时无法判断的部分，可以先做小范围验证。\n我更关注方案能否解决问题。如果最终没有采用我的方案，我会支持团队决定，同时吸收其中对后续工作有帮助的反馈。","lang":"zh","id":20,"done":false},{"cat":"自我特质","title":"你的优点是什么？","answer":"我的一个优点是处理信息时比较重视口径和依据。\n硕士研究需要连接不同来源的数据，我会关注名称、年份、缺失值和指标定义。例如，杀菌剂产品记录数与实际喷药次数并不是同一件事，不能混着解释。\n我认为这种习惯对业务工作也有价值，因为库存、采购或市场分析的结论，都需要建立在准确理解数据的基础上。","lang":"zh","id":21,"done":false},{"cat":"自我特质","title":"你的缺点是什么？","answer":"我在正式场合表达时，有时会想把背景交代得太完整，导致回答偏长，重点不够突出。\n这也让我意识到，掌握内容和清楚表达是两项不同的能力。我准备面试时，会把每个问题先压成几个关键词，再按照结论、例子和岗位联系来组织，提醒自己先回答问题，再补充必要细节。\n这方面还需要持续练习，但我已经明确了需要改进的地方。","lang":"zh","id":22,"done":false},{"cat":"自我特质","title":"有什么爱好？带给你什么能力？","answer":"我比较喜欢旅行，也有独自旅行的经历。\n旅行中需要自己安排交通、时间和预算，遇到变化时也要及时调整。我会提前确认必要信息，但不会把所有细节都安排得完全固定。\n这些经历让我更习惯独立作决定，也让我愿意进入陌生环境、主动解决实际问题。","lang":"zh","id":23,"done":false},{"cat":"自我特质","title":"朋友或导师怎么评价你？","answer":"如果从实际合作中的表现概括，我是比较愿意承担具体任务、把信息整理清楚的人。\n在校园工作和团队项目中，我经常参与统筹、材料整合和沟通衔接。对结果我有一定要求，也会关注不同部分之间是否一致。\n我还需要继续提高的是表达的简洁度，以及在合作中根据不同人的情况调整沟通方式。","lang":"zh","id":24,"done":false},{"cat":"自我特质","title":"喜欢独立工作还是团队协作？","answer":"我可以独立推进边界清楚的任务，也重视团队协作。\n像数据整理和初步分析，我习惯先独立梳理问题，形成一个可以讨论的结果。涉及目标、分工和跨环节影响时，我会及时与相关人员确认。\n我比较认可的工作方式是：前期把标准和接口说明白，过程中保持必要沟通，各自对负责的部分承担责任。","lang":"zh","id":25,"done":false},{"cat":"自我特质","title":"压力大时怎么调节？","answer":"我会先区分压力来自任务本身，还是来自不确定和担心。\n任务方面，我会把问题列出来，先完成最紧迫、最可执行的一步，让事情重新有进展。情绪方面，我会通过散步、听音乐、拼乐高，或者和熟悉的人交流来调整。\n如果压力来自进度风险，我也会提醒自己及时沟通，避免一直自己消化，最后影响交付。","lang":"zh","id":26,"done":false},{"cat":"岗位专业场景","title":"供应商突然延期供货，怎么处理？","answer":"我会先确认延期的原因、受影响的数量和预计到货时间，再核对现有库存、在途数量及受影响订单。\n之后与相关部门比较解决方案，例如分批到货、调整排产、跨仓调拨、使用合格替代供应商或加急运输，并评估成本与交付影响。替代原料涉及质量要求时，需要由相应团队确认。\n过程中及时反馈新的交付预期，问题结束后再复盘原因，判断是否需要调整供应商管理或备货安排。","lang":"zh","id":27,"done":false,"sub":"供应链/采购"},{"cat":"岗位专业场景","title":"怎么评估和筛选新供应商？","answer":"我会先明确采购需求，包括产品规格、数量、交付要求和必须满足的质量条件。\n在此基础上，比较供应商的质量稳定性、产能、交付记录、总成本和供应风险，再按产品风险开展必要的样品、资料或现场验证。\n价格是其中一项，但还要考虑运输、起订量、库存、损耗和质量问题成本。确定合作后，也需要持续观察实际表现。","lang":"zh","id":28,"done":false,"sub":"供应链/采购"},{"cat":"岗位专业场景","title":"怎么控制采购成本，同时保障质量？","answer":"我会先明确不能降低的质量和安全要求，再拆解总成本。\n可以分析规格是否过度、采购批量和频率是否合理、供应来源是否有替代，以及运输、库存和损耗有没有改善空间。谈判时也会考虑账期、交期和起订量带来的影响。\n判断方案是否有效，要看整体成本变化，避免采购单价下降，却增加了库存或质量问题成本。","lang":"zh","id":29,"done":false,"sub":"供应链/采购"},{"cat":"岗位专业场景","title":"怎么降低农产品流通损耗？","answer":"我会先定位损耗发生在哪个环节，以及主要原因是什么，例如机械损伤、温度控制、停留时间、包装或需求与补货不匹配。\n然后针对原因采取措施：改进装卸和包装，减少不必要的搬运；根据产品要求管理储运条件；按保质期安排出库；提高库存和销售的信息衔接。\n效果需要通过报损、退货、库龄和产品质量等记录持续验证，并比较减少损耗与新增投入之间的关系。","lang":"zh","id":30,"done":false,"sub":"供应链/采购"},{"cat":"岗位专业场景","title":"预测偏差导致库存积压或缺货，怎么办？","answer":"我会先核查库存和需求数据，再区分偏差来自预测、促销变化、供应延期，还是补货参数。\n积压时，重点看库龄、保质期和后续需求，讨论暂停补货、调拨或促销。缺货时，则确认可用库存、到货时间和订单优先级，比较加急或替代方案。\n之后按产品和渠道复盘预测误差，尤其关注持续高估或低估，并检查补货周期、安全库存和业务信息更新是否合理。","lang":"zh","id":31,"done":false,"sub":"供应链/采购"},{"cat":"岗位专业场景","title":"怎么搭建农产品行业研究框架？","answer":"我会先明确研究服务于什么决策，以及具体产品、地区和时间范围。\n框架上先看供给，包括面积、单产、产量、库存和贸易；需求端看消费结构、加工需求和替代关系；再分析成本、价格、政策及气候等影响因素。\n资料整理时统一单位和统计范围，区分事实、估算与假设。最终说明主要驱动因素、可能情景和需要持续跟踪的指标。","lang":"zh","id":32,"done":false,"sub":"农业数据/行业研究"},{"cat":"岗位专业场景","title":"拿到杂乱调研数据，分析步骤是什么？","answer":"我会先确认研究问题，以及每一行和每个字段代表什么。\n随后检查数据类型、单位、缺失、重复和异常记录，保留原始数据并记录处理过程。如果需要连接其他数据，确认匹配键和连接关系，核对合并前后的记录数及未匹配项。\n数据整理后，先做描述性分析，再根据问题选择统计方法。最后核查结果是否合理，并说明样本和方法对结论的限制。","lang":"zh","id":33,"done":false,"sub":"农业数据/行业研究"},{"cat":"岗位专业场景","title":"粮食安全政策怎样影响你理解行业？","answer":"它让我认识到，农业行业需要同时考虑生产能力、资源约束、流通和消费者获取食物的能力。\n研究具体政策时，我会关注它通过什么机制影响行业，例如改变生产激励、投入成本、种植选择、贸易或储备安排，以及这些变化怎样传导到企业。\n我也会区分政策目标与实际效果，结合执行情况和数据判断，避免只根据政策名称作结论。","lang":"zh","id":34,"done":false,"sub":"农业数据/行业研究"},{"cat":"岗位专业场景","title":"如何把消费者调研转化为业务建议？","answer":"我会先确认数据能够支持什么判断，再把发现转成可以验证的业务假设。\n例如本科宠物食品研究中，中英样本在食品安全和宠物口味关注上存在差异，可以据此提出不同的信息表达方向。但由于样本较小、采用便利抽样，我不会直接建议大范围推广。\n下一步需要结合更多目标消费者、购买数据或小范围测试，判断建议是否能影响实际选择。","lang":"zh","id":35,"done":false,"sub":"消费者洞察"},{"cat":"岗位专业场景","title":"消费者说喜欢，实际却不买，怎么解释？","answer":"“喜欢”和“愿意付钱购买”之间还存在价格、渠道、使用习惯和替代产品等因素。\n我会先检查调研是否模拟了真实选择，例如有没有说明价格、规格和购买条件；再比较购买者与未购买者的反馈，判断问题发生在产品、价值感知还是购买过程。\n验证时尽量观察实际行为，例如试购、复购或不同条件下的转化，而不只看喜好度。","lang":"zh","id":36,"done":false,"sub":"消费者洞察"},{"cat":"岗位专业场景","title":"如何判断问卷样本有偏？","answer":"我会先把受访者与目标人群比较，检查年龄、地区、使用经验等相关结构，再看招募渠道和未回应人群。\n某个群体占比高是否有问题，需要根据目标人群判断。除此之外，题目措辞、问卷长度和受访者理解也可能影响结果。\n如果发现偏差，会考虑补充招募、调整研究范围或在结论中明确限制，不把样本结果直接推广到整体市场。","lang":"zh","id":37,"done":false,"sub":"消费者洞察"},{"cat":"岗位专业场景","title":"常用什么分析工具，怎样用在项目中？","answer":"我主要使用Excel、SPSS和R。\nExcel用于数据整理、核对、基础函数和透视表汇总，例如气候风险课程中的日期处理、事件标记和概率计算。SPSS用于问卷和调查数据分析，本科宠物食品研究中使用过描述统计、交叉分析、卡方和Mann–Whitney U检验。\nR主要用于硕士农业研究，包括数据清理、多来源匹配、汇总、回归及敏感性分析。目前Python和SQL还不是我能够独立用于项目的主要工具。","lang":"zh","id":38,"done":false,"sub":"通用工具"},{"cat":"压力陷阱","title":"如果这次没有录取你，你觉得原因是什么？","answer":"在不了解最终反馈的情况下，我不会替面试结果作判断。\n从自己的背景看，我的企业实践经验还需要积累，对具体业务的理解也需要通过工作进一步加深。我的优势是食品与农业背景、数据处理训练，以及对相关方向的持续投入。\n如果有机会获得反馈，我希望了解具体差距，并据此改进后续准备。","lang":"zh","id":39,"done":false},{"cat":"压力陷阱","title":"还在投哪些公司？拿到其他offer了吗？","answer":"我主要围绕食品、快消和农业相关的供应链、采购及研究分析岗位投递，筛选逻辑比较一致，都是希望把行业背景和数据能力用于实际业务。\n关于其他面试和offer，我会按当前真实进度说明，也会及时沟通需要作决定的时间。我选择机会时，主要比较具体职责、培养方式、地点和整体待遇。","lang":"zh","id":40,"done":false},{"cat":"压力陷阱","title":"这个岗位枯燥、重复，你怎么看？","answer":"我能接受岗位中必要的重复工作，尤其是记录、核对和跟进，这些往往关系到后续业务是否可靠。\n我会先把标准和准确性做好，再观察是否存在可以改善的环节，例如减少重复录入、统一口径或优化核查方式。涉及流程调整时，我会先确认业务要求和权限。\n同时，我也希望在做好基础工作后，逐步理解这些任务与整体业务之间的联系。","lang":"zh","id":41,"done":false},{"cat":"压力陷阱","title":"工作成果不被领导认可怎么办？","answer":"我会先确认没有被认可的具体原因，是方向不符合需求、分析依据不足，还是表达没有突出重点。\n明确反馈后，先处理影响结果的主要问题，并确认修改后的交付标准。如果我认为某个判断有依据，也会把数据和限制说明清楚，听取对方的业务考虑。\n我的重点是让结果能够被使用，同时把这次反馈转化为下次更早确认需求的依据。","lang":"zh","id":42,"done":false},{"cat":"压力陷阱","title":"与其他候选人相比，劣势在哪里？","answer":"我的一个现实差距是，企业实践经验还不够丰富，对具体公司的系统、流程和商业节奏需要进一步学习。\n但我已经具备食品与农业知识、数据整理分析和英文资料处理的基础，也能够解释自己项目中的方法和限制。\n入职后，我会先把产品、流程和日常任务学扎实，通过准确交付和及时反馈逐步承担更多责任。","lang":"zh","id":43,"done":false},{"cat":"反问面试官","title":"这个岗位入职前三个月，最需要完成的任务是什么？","answer":"","lang":"zh","id":44,"done":false,"sub":"岗位业务"},{"cat":"反问面试官","title":"团队目前最希望这个岗位帮助解决的具体问题是什么？","answer":"","lang":"zh","id":45,"done":false,"sub":"岗位业务"},{"cat":"反问面试官","title":"这个岗位日常最经常与哪些部门合作？","answer":"","lang":"zh","id":46,"done":false,"sub":"岗位业务"},{"cat":"反问面试官","title":"新人通常怎样熟悉产品和业务流程？会由谁提供反馈？","answer":"","lang":"zh","id":47,"done":false,"sub":"团队成长"},{"cat":"反问面试官","title":"表现比较好的应届生，在入职初期通常有哪些共同特点？","answer":"","lang":"zh","id":48,"done":false,"sub":"团队成长"},{"cat":"反问面试官","title":"团队主要通过哪些结果判断新人已经能够独立承担工作？","answer":"","lang":"zh","id":49,"done":false,"sub":"考核发展"},{"cat":"反问面试官","title":"做好基础工作后，通常有哪些机会负责更完整的业务模块？","answer":"","lang":"zh","id":50,"done":false,"sub":"考核发展"},{"cat":"反问面试官","title":"如果有轮岗，通常涉及哪些部门、持续多久，以及怎样确定最终岗位？","answer":"","lang":"zh","id":51,"done":false,"sub":"轮岗培训"},{"cat":"反问面试官","title":"出差或外派主要对应哪些业务场景？频率和周期通常怎样安排？","answer":"","lang":"zh","id":52,"done":false,"sub":"轮岗培训"}]};
+    function loadInterview() {
+        try {
+            const raw = localStorage.getItem(INTERVIEW_KEY);
+            if (raw) {
+                const d = JSON.parse(raw);
+                if (d && Array.isArray(d.modules) && Array.isArray(d.questions)) {
+                    const curVer = d.version || 1;
+                    if (curVer < (INTERVIEW_SEED.version || 2)) {
+                        // 题库内容整体替换（用户明确要求用新版题库替换旧题库）
+                        const seed = JSON.parse(JSON.stringify(INTERVIEW_SEED));
+                        try { localStorage.setItem(INTERVIEW_KEY, JSON.stringify(seed)); } catch (e) {}
+                        return seed;
+                    }
+                    return d;
+                }
+            }
+        } catch (e) { /* 损坏则回退种子数据 */ }
+        const seed = JSON.parse(JSON.stringify(INTERVIEW_SEED));
+        try { localStorage.setItem(INTERVIEW_KEY, JSON.stringify(seed)); } catch (e) {}
+        return seed;
+    }
+    function saveInterview() {
+        try { localStorage.setItem(INTERVIEW_KEY, JSON.stringify(INTERVIEW)); } catch (e) { toast("保存失败：浏览器存储不可用"); }
+    }
+    let INTERVIEW = loadInterview();
+    let iqState = { mode: "add", idx: -1 };
+
+    function qRow(q) {
+        return `
+            <div class="q-item rounded-xl bg-slate-800/50 border border-slate-700/50 ${q.done ? "opacity-70" : ""}" data-id="${q.id}">
+                <div class="flex items-start gap-3 p-3.5">
+                    <label class="mt-0.5 flex items-center shrink-0 cursor-pointer">
+                        <input type="checkbox" class="q-toggle accent-emerald-400 w-4 h-4" ${q.done ? "checked" : ""} title="标记已掌握">
+                    </label>
+                    <div class="q-body flex-1 min-w-0 cursor-pointer">
+                        <p class="text-[13.5px] ${q.lang === "en" ? "italic text-slate-200" : "text-slate-200"} leading-relaxed">${escapeHtml(q.title)}</p>
+                        <div class="q-ans hidden-v mt-2 pt-2 border-t border-slate-700/50 text-xs leading-relaxed whitespace-pre-wrap ${q.answer ? "text-slate-400" : "text-slate-600"}">${q.answer ? escapeHtml(q.answer) : "参考答案待补充"}</div>
+                    </div>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button class="icon-btn q-edit !px-2" title="编辑">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                        </button>
+                        <button class="icon-btn q-del !px-2 !text-red-400 !border-red-400/30" title="删除">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+    }
+    function renderQuestions() {
+        const groups = {};
+        INTERVIEW.questions.forEach(q => { (groups[q.cat] = groups[q.cat] || []).push(q); });
+        const cats = Object.keys(groups).sort((a, b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b));
+        const list = $("question-list");
+        list.innerHTML = cats.map((cat, gi) => {
+            const qs = groups[cat];
+            const done = qs.filter(q => q.done).length;
+            // 模块内按方向子分组（q.sub），无 sub 的题直接列出
+            const subs = {};
+            qs.forEach(q => { const k = q.sub || ""; (subs[k] = subs[k] || []).push(q); });
+            const subKeys = Object.keys(subs).sort((a, b) => (a === "" ? 1 : 0) - (b === "" ? 1 : 0));
+            const body = subKeys.map(k => {
+                const sqs = subs[k];
+                return (k ? `<div class="text-[11px] font-semibold text-slate-500 mt-3 mb-1.5">${escapeHtml(k)}方向</div>` : "") +
+                    `<div class="space-y-2">${sqs.map(qRow).join("")}</div>`;
+            }).join("");
+            return `
+                <div class="mb-4 last:mb-0" id="cat-${gi}">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="text-sm font-semibold text-slate-300">${escapeHtml(cat)}</span>
+                        <span class="chip num">${done}/${qs.length} 已掌握</span>
+                    </div>
+                    ${body}
+                </div>`;
+        }).join("") || '<p class="text-sm text-slate-500 py-8 text-center">题库还是空的，点右上角「新增题目」开始录入</p>';
+        list.querySelectorAll(".q-item").forEach(el => {
+            const id = Number(el.dataset.id);
+            el.querySelector(".q-toggle").addEventListener("change", () => {
+                const q = INTERVIEW.questions.find(x => x.id === id);
+                if (q) { q.done = el.querySelector(".q-toggle").checked; saveInterview(); renderInterviewAll(); }
+            });
+            el.querySelector(".q-body").addEventListener("click", () => {
+                const ans = el.querySelector(".q-ans");
+                if (ans) ans.classList.toggle("hidden-v");
+            });
+            el.querySelector(".q-edit").addEventListener("click", () => openQModal("edit", id));
+            el.querySelector(".q-del").addEventListener("click", () => delQuestion(id));
+        });
+    }
+    function renderInterviewStats() {
+        const total = INTERVIEW.questions.length;
+        const done = INTERVIEW.questions.filter(q => q.done).length;
+        $("iq-stats").textContent = "已掌握 " + done + " / 共 " + total + " 题";
+    }
+    function renderTOC() {
+        const groups = {};
+        INTERVIEW.questions.forEach(q => { (groups[q.cat] = groups[q.cat] || []).push(q); });
+        const cats = Object.keys(groups).sort((a, b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b));
+        const toc = $("iq-toc-list");
+        toc.innerHTML = cats.map((cat, i) => `
+            <div class="mb-2.5">
+                <button class="toc-g w-full text-left text-xs font-semibold text-slate-300 hover:text-slate-100 transition-colors flex items-center justify-between gap-2 py-1 cursor-pointer" data-jump="g:${i}">
+                    <span>${escapeHtml(cat)}</span>
+                    <span class="chip num !text-[10px] !px-1.5">${groups[cat].length}</span>
+                </button>
+                <div class="space-y-0.5 mt-0.5 border-l border-slate-700/40 pl-2">
+                    ${groups[cat].map(q => `<button class="toc-q w-full text-left text-[11px] leading-snug text-slate-500 hover:text-slate-200 transition-colors py-0.5 truncate cursor-pointer" data-jump="q:${q.id}" title="${escapeHtml(q.title)}">${escapeHtml(q.title)}</button>`).join("")}
+                </div>
+            </div>`).join("");
+        const tocM = $("iq-toc-m");
+        tocM.innerHTML = cats.map((cat, i) => `<button class="toc-m chip shrink-0 !py-1.5 cursor-pointer" data-jump="g:${i}">${escapeHtml(cat)}</button>`).join("");
+    }
+    function jumpTo(target) {
+        let el = null;
+        if (target.indexOf("q:") === 0) el = document.querySelector('.q-item[data-id="' + Number(target.slice(2)) + '"]');
+        else if (target.indexOf("g:") === 0) el = document.getElementById("cat-" + target.slice(2));
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: target.indexOf("q:") === 0 ? "center" : "start" });
+        el.classList.add("toc-hit");
+        setTimeout(() => el.classList.remove("toc-hit"), 1700);
+    }
+    const CAT_ORDER = ["基础动机认知", "行为STAR", "自我特质", "岗位专业场景", "压力陷阱", "反问面试官"];
+    const ATTACK_POINTS = [
+        { label: "食品专业背景", tip: "北京农学院 × 哈珀亚当斯大学中外合作：食品科学 / 食品质量 / 零售管理" },
+        { label: "农业运营实习", tip: "出入库、冷库、农事记录整理" },
+        { label: "端到端供应链分析", tip: "咖啡供应链、零售商与供应商合作" },
+        { label: "R 数据分析 / 硕士研究", tip: "商业小麦调查数据 + AHDB 品种抗病评分：清理、匹配、统计" },
+        { label: "供应链 / 采购长期方向", tip: "食品行业知识 + 数据分析 → 库存、交付与供应商管理" }
+    ];
+    function renderOverview() {
+        const total = INTERVIEW.questions.length;
+        const done = INTERVIEW.questions.filter(q => q.done).length;
+        const plan = INTERVIEW.plan || [];
+        const planDone = plan.filter(p => p.done).length;
+        $("ov-attack").textContent = ATTACK_POINTS.length;
+        $("ov-total").textContent = total;
+        $("ov-plan").textContent = planDone + "/" + plan.length;
+        const g0 = CAT_ORDER.indexOf("基础动机认知");
+        $("ov-attacks").innerHTML = ATTACK_POINTS.map(a => `
+            <button class="chip cursor-pointer transition-colors hover:border-blue-400/50 hover:text-blue-300" data-jump="g:${g0}" title="${escapeHtml(a.tip)}">${escapeHtml(a.label)}</button>`).join("");
+        $("ov-progress-text").textContent = done + "/" + total;
+        $("ov-progress-bar").style.width = (total ? Math.round(done / total * 100) : 0) + "%";
+    }
+    function renderPlan() {
+        const plan = INTERVIEW.plan || [];
+        const groups = {};
+        INTERVIEW.questions.forEach(q => { (groups[q.cat] = groups[q.cat] || []).push(q); });
+        $("plan-stats").textContent = plan.filter(p => p.done).length + "/" + plan.length + " 步";
+        $("plan-list").innerHTML = plan.map((p, i) => {
+            const qs = groups[p.name] || [];
+            const done = qs.filter(q => q.done).length;
+            return `
+                <label class="flex items-center gap-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 px-3.5 py-2.5 cursor-pointer ${p.done ? "opacity-70" : ""}">
+                    <input type="checkbox" class="plan-toggle accent-emerald-400 w-4 h-4 shrink-0" data-i="${i}" ${p.done ? "checked" : ""}>
+                    <span class="flex-1 min-w-0">
+                        <span class="block text-[13px] text-slate-200 truncate">${i + 1}. ${escapeHtml(p.name)}</span>
+                        <span class="block text-[11px] text-slate-500">${done}/${qs.length} 已掌握</span>
+                    </span>
+                </label>`;
+        }).join("");
+        $("plan-list").querySelectorAll(".plan-toggle").forEach(cb => cb.addEventListener("change", () => {
+            const i = Number(cb.dataset.i);
+            if (INTERVIEW.plan && INTERVIEW.plan[i]) {
+                INTERVIEW.plan[i].done = cb.checked;
+                saveInterview();
+                renderOverview();
+                renderPlan();
+                renderInterviewStats();
+            }
+        }));
+    }
+    function renderInterviewAll() { renderOverview(); renderPlan(); renderQuestions(); renderInterviewStats(); renderTOC(); }
+
+    // 题目弹窗
+    const qmodal = $("qmodal");
+    const qform = $("q-form");
+    function refreshCatList() {
+        const cats = [...new Set(INTERVIEW.questions.map(q => q.cat))];
+        $("cat-list").innerHTML = cats.map(c => '<option value="' + escapeHtml(c) + '"></option>').join("");
+    }
+    function openQModal(mode, id) {
+        iqState.mode = mode; iqState.idx = id;
+        $("qmodal-title").textContent = mode === "add" ? "新增题目" : "编辑题目";
+        qform.reset();
+        refreshCatList();
+        if (mode === "edit") {
+            const q = INTERVIEW.questions.find(x => x.id === id);
+            if (q) {
+                qform.elements.cat.value = q.cat;
+                qform.elements.lang.value = q.lang || "zh";
+                qform.elements.title.value = q.title;
+                qform.elements.answer.value = q.answer || "";
+            }
+        }
+        qmodal.classList.remove("hidden-v");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => qform.elements.title.focus(), 60);
+    }
+    function closeQModal() { qmodal.classList.add("hidden-v"); document.body.style.overflow = ""; }
+    qform.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const title = (qform.elements.title.value || "").trim();
+        const cat = (qform.elements.cat.value || "").trim();
+        if (!title || !cat) { toast("分类和题目不能为空"); return; }
+        const answer = (qform.elements.answer.value || "").trim();
+        const lang = qform.elements.lang.value;
+        if (iqState.mode === "add") {
+            INTERVIEW.questions.push({ id: Date.now(), cat, title, answer, done: false, lang });
+            toast("已新增题目");
+        } else {
+            const q = INTERVIEW.questions.find(x => x.id === iqState.idx);
+            if (q) { q.cat = cat; q.title = title; q.answer = answer; q.lang = lang; toast("已保存题目"); }
+        }
+        saveInterview();
+        closeQModal();
+        renderInterviewAll();
+    });
+    function delQuestion(id) {
+        const q = INTERVIEW.questions.find(x => x.id === id);
+        if (!q || !confirm("确定删除这道题吗？")) return;
+        INTERVIEW.questions = INTERVIEW.questions.filter(x => x.id !== id);
+        saveInterview();
+        toast("已删除");
+        renderInterviewAll();
+    }
+
+    // ===== 待投递池 =====
+    const PENDING_KEY = "pending-tracker-v1";
+    let PENDING = { version: 1, items: [] };
+    const PENDING_CLS = { "待投递": "st-blue", "暂缓": "st-slate", "已投递": "st-emerald" };
+    function loadPending() {
+        try { const raw = localStorage.getItem(PENDING_KEY); if (raw) { const d = JSON.parse(raw); if (d && Array.isArray(d.items)) PENDING = d; } } catch (e) {}
+        if (!PENDING || !Array.isArray(PENDING.items)) PENDING = { version: 1, items: [] };
+    }
+    function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(PENDING)); } catch (e) {} }
+    function fmtUpd(d) {
+        if (!d) return "—";
+        const t = new Date(d);
+        if (isNaN(t.getTime())) return d;
+        const now = new Date();
+        if (t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth() && t.getDate() === now.getDate()) return "今天";
+        return (t.getMonth() + 1) + "月" + t.getDate() + "日";
+    }
+    function fmtDd(d) {
+        if (!d) return "";
+        const t = new Date(d);
+        if (isNaN(t.getTime())) return d;
+        const now = new Date();
+        const days = Math.round((t - now) / 86400000);
+        const md = (t.getMonth() + 1) + "月" + t.getDate() + "日";
+        if (days < 0) return { txt: "已截止 " + md, cls: "dd-over" };
+        if (days === 0) return { txt: "今天截止", cls: "dd-soon" };
+        return { txt: "截止 " + md, cls: "dd-ok" };
+    }
+    function renderPending() {
+        loadPending();
+        const list = $("pd-list");
+        $("pd-stats").textContent = PENDING.items.length + " 项";
+        if (!PENDING.items.length) {
+            list.innerHTML = '<div class="glass-panel rounded-2xl p-10 text-center text-slate-500">还没有待投递项，先在上面输入一个名字吧</div>';
+            return;
+        }
+        const items = [...PENDING.items].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+        list.innerHTML = items.map(it => {
+            const cls = PENDING_CLS[it.status] || "st-blue";
+            const sub = [(it.role || "").trim() || "岗位待补充", (it.base || "").trim()].filter(Boolean).join(" · ");
+            const dd = fmtDd(it.deadline);
+            return `<div class="p-card rounded-xl bg-slate-800/50 border border-slate-700/60 p-4 cursor-pointer" data-id="${it.id}">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="text-[15px] font-semibold truncate">${escapeHtml(it.name)}</div>
+                        <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(sub)}</div>
+                    </div>
+                    <span class="st ${cls} shrink-0">${escapeHtml(it.status)}</span>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>更新于 ${fmtUpd(it.updatedAt)}</span>
+                    <span class="flex items-center gap-2">
+                        ${dd ? '<span class="dd ' + dd.cls + '">' + dd.txt + "</span>" : ""}
+                        <span class="text-emerald-400">编辑 ›</span>
+                    </span>
+                </div>
+            </div>`;
+        }).join("");
+        list.querySelectorAll(".p-card").forEach(el => el.addEventListener("click", () => openPModal(Number(el.dataset.id))));
+    }
+    function addPending() {
+        loadPending();
+        const inp = $("pd-input");
+        const name = (inp.value || "").trim();
+        if (!name) { toast("先输入公司或职位名称"); inp.focus(); return; }
+        PENDING.items.push({ id: Date.now(), name, status: "待投递", role: "", base: "", salary: "", link: "", note: "", updatedAt: today() });
+        savePending();
+        inp.value = "";
+        toast("已加入待投递");
+        renderPending();
+    }
+    // ===== 一次性加入用户点名的公司到待投递（此后正常删除不会再加回） =====
+    const PENDING_SEED2_KEY = "pending-tracker-v1-seed2";
+    const PENDING_SEED2 = [
+        { name: "京东", role: "采销岗" },
+        { name: "盒马", role: "" },
+        { name: "永辉超市", role: "" },
+        { name: "苏宁易购", role: "" },
+        { name: "拼多多", role: "物流运营" },
+        { name: "名创优品", role: "海外采购创优生" },
+        { name: "泡泡玛特", role: "" },
+        { name: "君乐宝", role: "" },
+        { name: "青蛙王子", role: "销售管培生" },
+        { name: "海大集团", role: "配方师/研发/兽医" },
+        { name: "跑红集团", role: "内容运营/产品营销/渠道销售" },
+        { name: "华润万家", role: "智数/线上业务/营运管培生" },
+        { name: "瑞吉食品", role: "多语种业务管培生" },
+        { name: "果如食品", role: "销售/研发/质量管培生" },
+        { name: "好想来", role: "运营/物流/人力管培生" },
+        { name: "白象食品集团", role: "研发/营销市场/供应链/电商类" },
+        { name: "康师傅", role: "管培生" },
+        { name: "隔壁刘奶奶", role: "CXO管培生" },
+        { name: "李锦记酱料中国区", role: "管培生" },
+        { name: "英贝健", role: "营销/电商/供应链管培生" },
+        { name: "盐津铺子", role: "营销/研发/产品/生产/供应链类" },
+        { name: "贝泰妮集团", role: "研发工程师" },
+        { name: "沃尔玛中国", role: "总部支持中心管培生" },
+        { name: "欧莱雅", role: "研发和创新管理培训生" },
+        { name: "迈瑞医疗", role: "技术支持/职能/研发/营销" },
+        { name: "携程集团", role: "研发/产品/设计/综合类" },
+        { name: "加多宝集团", role: "销售/推广/生产管培生" },
+        { name: "双汇", role: "管培生（食品/生化/畜牧/养殖）" },
+        { name: "海底捞", role: "管培生" },
+        { name: "包道集团", role: "营运/生产管理培训生" },
+        { name: "新希望六和", role: "管培/品管/兽医/营销类" },
+        { name: "新希望集团", role: "全球管理培训生" },
+        { name: "利洁时(中国)", role: "管培生" },
+        { name: "三只松鼠", role: "制造/生产管理/质量管培生" },
+        { name: "农夫山泉", role: "生产类" },
+        { name: "一鸣食品", role: "烘焙/店长储干" },
+        { name: "美团", role: "食杂零售岗位专场" },
+        { name: "科赛基农", role: "国内/国际营销管培生" },
+        { name: "中宠股份", role: "OEM/产品/研发管培生" },
+        { name: "奥智生物", role: "技术型销售工程师" },
+        { name: "西诺迪斯食品(上海)", role: "" },
+        { name: "优然牧业", role: "畜牧生产/研发技术/安全管理" },
+        { name: "益海嘉里(金龙鱼)", role: "生产/品管/储运/财务类" },
+        { name: "稳健医疗", role: "供应链/产品注册/智能制造" },
+        { name: "海尼集团", role: "新媒体内容/运营" },
+        { name: "大王椰控股集团", role: "营销/产品/供应链管培生" },
+        { name: "雅培", role: "运营管理培训生" },
+        { name: "迪卡侬", role: "运动部门经理/全渠道运营" },
+        { name: "KK集团", role: "总部管培生（商品/设计/供应链）" },
+        { name: "元气森林", role: "销售培训生" },
+        { name: "中垦牧乳业(集团)", role: "产业管理岗" },
+        { name: "重庆市天友乳业", role: "营销管培生" },
+        { name: "凡岛", role: "广告营销/日化产品/AI技术类" },
+        { name: "温氏股份", role: "生产技术/技术服务/畜禽研发" },
+        { name: "UndoAge", role: "产品/用户运营管培生" },
+        { name: "欣旺达", role: "研发/运营/职能/营销类" },
+        { name: "三一集团", role: "研发技术/计算机及AI/生产制造" },
+        { name: "中国飞鹤", role: "管培生（食品/机械/电气/农学）" },
+        { name: "老乡鸡", role: "AI增长/品牌体验/门店增长" },
+        { name: "认养一头牛集团", role: "新零售销售管培生" },
+        { name: "卡旺卡", role: "品牌/供应链/研发/营建/IT类" },
+        { name: "SHEIN", role: "信息技术/商品平台/服装供应链" },
+        { name: "Apple苹果", role: "硬件/软件/服务类" },
+        { name: "雀巢中国", role: "管理培训生" },
+        { name: "桃李面包", role: "生产/质量储备干部" },
+        { name: "德康集团", role: "饲料/养殖/食品/数智类" },
+        { name: "SGS", role: "化学化工/材料类" },
+        { name: "海天味业", role: "营销管理/研发技术/供应链类" },
+        { name: "神农集团", role: "养殖/饲料生产方向" },
+        { name: "旷世芳香控股", role: "制造/供应链/品牌营销管培生" },
+        { name: "青莲食品", role: "育种/兽医/饲料岗" },
+        { name: "维亚生物", role: "AI算法/计算化学研究员" },
+        { name: "GE医疗集团", role: "财务管理/质量法规管理培训生" },
+        { name: "哈药集团", role: "研发/设备/生产管培生" },
+        { name: "上海医药", role: "研发/管理/技术/营销/生产" },
+        { name: "吉林梅花", role: "定向/普通校招生" },
+        { name: "罗氏", role: "管理培训生" },
+        { name: "安琪集团", role: "农业微生物研发高级工程师" }
+    ];
+    function seedPendingItems() {
+        loadPending();
+        let marked = [];
+        try { marked = JSON.parse(localStorage.getItem(PENDING_SEED2_KEY) || "[]"); } catch (e) {}
+        const added = [];
+        PENDING_SEED2.forEach((it, k) => {
+            if (marked.includes(it.name)) return;
+            if (PENDING.items.some(x => x.name === it.name)) { marked.push(it.name); return; }
+            PENDING.items.push({ id: Date.now() + k, name: it.name, status: "待投递", role: it.role, base: "", salary: "", link: "", note: "", updatedAt: today() });
+            marked.push(it.name);
+            added.push(it.name);
+        });
+        if (marked.length) { try { localStorage.setItem(PENDING_SEED2_KEY, JSON.stringify(marked)); } catch (e) {} }
+        if (added.length) {
+            savePending();
+            toast("已加入待投递：" + added.join("、"));
+        }
+    }
+    const pmodal = $("pmodal");
+    const pform = $("p-form");
+    let pIdx = null;
+    function openPModal(id) {
+        loadPending();
+        const it = PENDING.items.find(x => x.id === id);
+        if (!it) return;
+        pIdx = id;
+        pform.reset();
+        pform.elements.name.value = it.name || "";
+        pform.elements.status.value = it.status || "待投递";
+        pform.elements.role.value = it.role || "";
+        pform.elements.base.value = it.base || "";
+        pform.elements.salary.value = it.salary || "";
+        pform.elements.link.value = it.link || "";
+        pform.elements.note.value = it.note || "";
+        pform.elements.deadline.value = it.deadline || "";
+        pmodal.classList.remove("hidden-v");
+        document.body.style.overflow = "hidden";
+        setTimeout(() => pform.elements.name.focus(), 60);
+    }
+    function closePModal() { pmodal.classList.add("hidden-v"); document.body.style.overflow = ""; }
+    pform.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = (pform.elements.name.value || "").trim();
+        if (!name) { toast("名称不能为空"); return; }
+        const it = PENDING.items.find(x => x.id === pIdx);
+        if (!it) { closePModal(); return; }
+        const status = pform.elements.status.value;
+        it.name = name;
+        it.status = status;
+        it.role = (pform.elements.role.value || "").trim();
+        it.base = (pform.elements.base.value || "").trim();
+        it.salary = (pform.elements.salary.value || "").trim();
+        it.link = (pform.elements.link.value || "").trim();
+        it.note = (pform.elements.note.value || "").trim();
+        it.deadline = (pform.elements.deadline.value || "").trim();
+        it.updatedAt = today(); // 最新更新日期自动填为编辑当天
+        savePending();
+        closePModal();
+        if (status === "已投递") {
+            transferToApply(it);
+            toast("已转入投递总览");
+        } else {
+            toast("已保存");
+        }
+        renderPending();
+        if (state.view === "calendar") renderCalendar();
+    });
+    function transferToApply(it) {
+        APPLICATIONS.push(Object.assign({ id: uid("a") }, {
+            company: it.name, role: it.role, status: "已投递",
+            base: splitTags(it.base), nature: [],
+            salary: it.salary, applyTime: today(), latestDate: today(),
+            deadline: it.deadline || "", link: it.link, remark: it.note, timeline: "投递 " + today()
+        }));
+        PENDING.items = PENDING.items.filter(x => x.id !== it.id);
+        saveData();
+        savePending();
+        refreshAll();
+        if (state.view === "calendar") renderCalendar();
+    }
+    function delPending(id) {
+        const it = PENDING.items.find(x => x.id === id);
+        if (!it || !confirm("确定删除「" + it.name + "」吗？")) return;
+        PENDING.items = PENDING.items.filter(x => x.id !== id);
+        savePending();
+        closePModal();
+        toast("已删除");
+        renderPending();
+    }
+
+    // ===== 飞书 CSV 同步 =====
+    function csvEscape(v) {
+        v = String(v == null ? "" : v);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    function downloadCsv(name, rows) {
+        const csv = "\ufeff" + rows.map(r => r.map(csvEscape).join(",")).join("\r\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+    }
+    function parseCsv(text) {
+        const rows = [];
+        let row = [], cur = "", inQ = false;
+        const s = String(text || "").replace(/^\ufeff/, "");
+        for (let i = 0; i < s.length; i++) {
+            const c = s[i];
+            if (inQ) {
+                if (c === '"') { if (s[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+                else cur += c;
+            } else if (c === '"') inQ = true;
+            else if (c === ",") { row.push(cur); cur = ""; }
+            else if (c === "\n" || c === "\r") {
+                if (c === "\r" && s[i + 1] === "\n") i++;
+                row.push(cur); cur = "";
+                if (row.some(x => x.trim() !== "")) rows.push(row);
+                row = [];
+            } else cur += c;
+        }
+        row.push(cur);
+        if (row.some(x => x.trim() !== "")) rows.push(row);
+        return rows;
+    }
+    function normDate(v) {
+        v = String(v == null ? "" : v).trim();
+        const m = v.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+        if (m) return m[1] + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[3]).padStart(2, "0");
+        return v.length === 10 && v.includes("-") ? v : "";
+    }
+    function splitTags(v) { return String(v || "").split(/[,;、，；]/).map(x => x.trim()).filter(Boolean); }
+
+    function exportApplyCsv() {
+        const rows = [["公司名称", "岗位", "状态", "Base", "单位性质", "薪资", "投递时间", "最新进度日期", "截止日期", "投递链接", "备注", "timeline"]];
+        APPLICATIONS.forEach(a => rows.push([
+            a.company || "", a.role || "", a.status || "", (a.base || []).join(", "), (a.nature || []).join(", "),
+            a.salary || "", a.applyTime || "", a.latestDate || "", a.deadline || "", a.link || "", a.remark || "", a.timeline || ""
+        ]));
+        downloadCsv("投递记录_" + today() + ".csv", rows);
+        toast("已导出投递 CSV");
+    }
+    function importApplyCsv(text) {
+        const rows = parseCsv(text);
+        if (rows.length < 2) { toast("CSV 内容为空或格式不对"); return; }
+        const h = rows[0].map(x => x.trim());
+        const idx = n => h.indexOf(n);
+        const STATUS_OK = ["已投递", "已笔试", "已一面", "面试中", "已拿Offer", "已终止"];
+        const out = [];
+        for (let i = 1; i < rows.length; i++) {
+            const r = rows[i];
+            const get = n => { const k = idx(n); return k >= 0 ? (r[k] || "") : ""; };
+            const company = get("公司名称") || get("公司") || "";
+            const role = get("岗位") || "";
+            if (!company && !role) continue;
+            let st = get("状态");
+            if (!STATUS_OK.includes(st)) st = "已投递";
+            out.push(Object.assign({ id: uid("a") }, {
+                company, role, status: st,
+                base: splitTags(get("Base")),
+                nature: splitTags(get("单位性质") || get("方向标签")),
+                salary: get("薪资"), applyTime: normDate(get("投递时间")),
+                latestDate: normDate(get("最新进度日期")), deadline: normDate(get("截止日期")),
+                link: get("投递链接"), remark: get("备注"), timeline: get("timeline")
+            }));
+        }
+        if (!out.length) { toast("没有解析到有效记录"); return; }
+        try { localStorage.setItem("apply-tracker-v1-backup", JSON.stringify(APPLICATIONS)); } catch (e) {}
+        APPLICATIONS = out;
+        saveData();
+        renderKpis(); renderCharts(); renderTable(); renderTimeline();
+        toast("已导入 " + out.length + " 条（旧数据已备份）");
+    }
+    function exportPendingCsv() {
+        const rows = [["名称", "状态", "岗位", "Base", "薪资", "投递链接", "备注", "更新日期"]];
+        PENDING.items.forEach(it => rows.push([
+            it.name || "", it.status || "待投递", it.role || "", it.base || "", it.salary || "", it.link || "", it.note || "", it.updatedAt || ""
+        ]));
+        downloadCsv("待投递_" + today() + ".csv", rows);
+        toast("已导出待投递 CSV");
+    }
+    function importPendingCsv(text) {
+        const rows = parseCsv(text);
+        if (rows.length < 2) { toast("CSV 内容为空或格式不对"); return; }
+        const h = rows[0].map(x => x.trim());
+        const idx = n => h.indexOf(n);
+        const ST_OK = ["待投递", "暂缓", "已投递"];
+        const out = [];
+        for (let i = 1; i < rows.length; i++) {
+            const r = rows[i];
+            const get = n => { const k = idx(n); return k >= 0 ? (r[k] || "") : ""; };
+            const name = get("名称");
+            if (!name) continue;
+            let st = get("状态");
+            if (!ST_OK.includes(st)) st = "待投递";
+            out.push({
+                id: Date.now() + i, name, status: st, role: get("岗位"), base: get("Base"),
+                salary: get("薪资"), link: get("投递链接"), note: get("备注"),
+                updatedAt: normDate(get("更新日期")) || today()
+            });
+        }
+        if (!out.length) { toast("没有解析到有效记录"); return; }
+        try { localStorage.setItem("pending-tracker-v1-backup", JSON.stringify(PENDING.items)); } catch (e) {}
+        PENDING.items = out;
+        savePending();
+        renderPending();
+        toast("已导入 " + out.length + " 条（旧数据已备份）");
+    }
+
+    const syncmodal = $("syncmodal");
+    let syncMode = "apply";
+    function openSyncModal(mode) {
+        syncMode = mode;
+        $("syncmodal-title").textContent = "从 CSV 导入（" + (mode === "apply" ? "投递记录" : "待投递池") + "）";
+        $("syncmodal-desc").textContent = "支持飞书多维表格导出的 CSV。导入将替换当前数据，旧数据会自动备份。";
+        $("sync-file").value = "";
+        $("sync-text").value = "";
+        syncmodal.classList.remove("hidden-v");
+        document.body.style.overflow = "hidden";
+    }
+    function closeSyncModal() { syncmodal.classList.add("hidden-v"); document.body.style.overflow = ""; }
+    function doImport() {
+        const f = $("sync-file").files[0];
+        const text = $("sync-text").value.trim();
+        if (f) {
+            const rd = new FileReader();
+            rd.onload = () => { (syncMode === "apply" ? importApplyCsv : importPendingCsv)(rd.result); closeSyncModal(); };
+            rd.onerror = () => toast("文件读取失败");
+            rd.readAsText(f);
+            return;
+        }
+        if (!text) { toast("请粘贴 CSV 内容或选择文件"); return; }
+        (syncMode === "apply" ? importApplyCsv : importPendingCsv)(text);
+        closeSyncModal();
+    }
+
+    // ===== 绑定 =====
+    function bind() {
+        document.querySelectorAll(".nav-item").forEach(el => el.addEventListener("click", () => switchView(el.dataset.view)));
+        $("search").addEventListener("input", e => { state.q = e.target.value; renderTable(); });
+        $("status-filter").addEventListener("change", e => { state.filterKey = e.target.value; renderKpis(); renderTable(); });
+        $("btn-add").addEventListener("click", () => openModal("add"));
+        $("btn-add-m").addEventListener("click", () => openModal("add"));
+        $("btn-add-side").addEventListener("click", () => openModal("add"));
+        $("modal-close").addEventListener("click", closeModal);
+        $("btn-cancel").addEventListener("click", closeModal);
+        modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+        document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.classList.contains("hidden-v")) closeModal(); });
+        $("btn-export").addEventListener("click", exportData);
+        $("btn-reset").addEventListener("click", resetData);
+        $("btn-theme").addEventListener("click", () => setTheme(document.body.classList.contains("light") ? "dark" : "light"));
+        $("btn-theme-m").addEventListener("click", () => setTheme(document.body.classList.contains("light") ? "dark" : "light"));
+        $("btn-heat-prev").addEventListener("click", () => { if (heatMonthIdx > 0) { heatMonthIdx--; buildHeat(); } });
+        $("btn-heat-next").addEventListener("click", () => { if (heatMonthIdx < HEAT_MONTHS.length - 1) { heatMonthIdx++; buildHeat(); } });
+        $("btn-cal-prev").addEventListener("click", () => calShift(-1));
+        $("btn-cal-next").addEventListener("click", () => calShift(1));
+        $("btn-cal-today").addEventListener("click", () => { calReset(); renderCalendar(); });
+        $("btn-q-add").addEventListener("click", () => openQModal("add"));
+        $("qmodal-close").addEventListener("click", closeQModal);
+        $("q-cancel").addEventListener("click", closeQModal);
+        qmodal.addEventListener("click", e => { if (e.target === qmodal) closeQModal(); });
+        document.addEventListener("keydown", e => {
+            if (e.key !== "Escape") return;
+            if (!qmodal.classList.contains("hidden-v")) closeQModal();
+            if (!pmodal.classList.contains("hidden-v")) closePModal();
+            if (!syncmodal.classList.contains("hidden-v")) closeSyncModal();
+        });
+        $("btn-pd-add").addEventListener("click", addPending);
+        $("pd-input").addEventListener("keydown", e => { if (e.key === "Enter") addPending(); });
+        $("pmodal-close").addEventListener("click", closePModal);
+        $("p-cancel").addEventListener("click", closePModal);
+        pmodal.addEventListener("click", e => { if (e.target === pmodal) closePModal(); });
+        $("p-del").addEventListener("click", () => { if (pIdx != null) delPending(pIdx); });
+        $("btn-apply-export").addEventListener("click", exportApplyCsv);
+        $("btn-apply-import").addEventListener("click", () => openSyncModal("apply"));
+        $("btn-pd-export").addEventListener("click", exportPendingCsv);
+        $("btn-pd-import").addEventListener("click", () => openSyncModal("pending"));
+        $("syncmodal-close").addEventListener("click", closeSyncModal);
+        $("sync-cancel").addEventListener("click", closeSyncModal);
+        syncmodal.addEventListener("click", e => { if (e.target === syncmodal) closeSyncModal(); });
+        $("sync-import").addEventListener("click", doImport);
+        ["iq-toc-list", "iq-toc-m", "ov-attacks"].forEach(id => $(id).addEventListener("click", e => {
+            const b = e.target.closest("[data-jump]");
+            if (b) jumpTo(b.dataset.jump);
+        }));
+        window.addEventListener("resize", () => charts.forEach(c => c.resize()));
+    }
+
+    // ===== 当前日期时间（实时刷新） =====
+    function tickClock() {
+        const el = $("clock-chip");
+        if (!el) return;
+        const d = new Date();
+        const wk = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+        const p = n => String(n).padStart(2, "0");
+        el.textContent = d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + wk + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
+
+    // ===== 启动 =====
+    (() => {
+        let t0 = "light";
+        try { t0 = localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light"; } catch (e) {}
+        document.body.classList.toggle("light", t0 === "light");
+        updateThemeUI(t0);
+        refreshChartTheme();
+    })();
+    renderCharts();
+    renderTable();
+    renderTimeline();
+    renderInterviewAll();
+    seedPendingItems();
+    renderKpis();
+    renderPending();
+    bind();
+</script>
+</body>
+</html>
 
