@@ -1,0 +1,25 @@
+{
+  "name": "投递追踪仪表盘",
+  "short_name": "投递追踪",
+  "description": "秋招投递追踪：总览、时间轴、题库、待投递池、投递日历，Gitee 云端多端同步",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8F5EE",
+  "theme_color": "#356B3F",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

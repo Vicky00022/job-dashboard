@@ -3,11 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#F8F5EE">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="投递追踪">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>投递追踪仪表盘</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23356B3F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8'/%3E%3Cpath d='M14 7h7v7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://fastly.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
+    /* ===== 布局骨架自保护：不依赖 Tailwind 响应式变体，确保侧栏永不遮挡主内容 ===== */
+    .app-shell { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { display: none; flex: 0 0 256px; flex-direction: column; min-width: 0; }
+    .main-area { flex: 1 1 auto; min-width: 0; height: 100%; overflow-y: auto; position: relative; }
+    .ver-chip { font-size:12px; font-weight:600; vertical-align:middle; margin-left:8px; padding:2px 9px; border-radius:9999px; background:rgba(53,107,63,0.12); border:1px solid rgba(53,107,63,0.35); letter-spacing:.02em; }
+    @media (min-width: 1024px) { .sidebar { display: flex; } }
+    @media (max-width: 1023px) { .sidebar { display: none !important; } }
     :root {
         --bg: #17213c; --panel: rgba(40,57,90,0.66); --line: rgba(148,163,184,0.2);
         --text: #f8fafc; --muted: #94a3b8;
@@ -73,10 +88,57 @@
     .chip { display:inline-flex; padding:1px 8px; border-radius:6px; font-size:11px; color:#94a3b8; background:#1e293b; border:1px solid rgba(148,163,184,0.2); white-space:nowrap; }
     #clock-chip { font-size:14px; font-weight:700; color:#2A2723; background:rgba(53,107,63,0.10); border:1.5px solid rgba(53,107,63,0.45); border-radius:9px; padding:4px 12px; letter-spacing:.02em; box-shadow:0 1px 2px rgba(53,107,63,.08); white-space:nowrap; }
     body:not(.light) #clock-chip { color:#E6F0E9; background:rgba(53,107,63,0.22); border-color:rgba(139,195,154,0.5); box-shadow:0 1px 2px rgba(0,0,0,.25); }
+    /* ===== 灯塔晨光主题：视图顶栏 ===== */
+    section[id^="view-"] > header {
+        position: relative;
+        background-image: linear-gradient(180deg, rgba(21,30,56,.66), rgba(21,30,56,.26) 52%, rgba(21,30,56,.58)), url("hero-bg.jpg");
+        background-size: cover;
+        background-position: center 28%;
+        border-radius: 18px;
+        padding: 30px 24px 20px;
+        min-height: 178px;
+        color: #fff;
+        overflow: hidden;
+    }
+    section[id^="view-"] > header h2 { color:#fff !important; text-shadow:0 1px 10px rgba(15,22,44,.5); }
+    section[id^="view-"] > header .chip,
+    section[id^="view-"] > header .btn-ghost,
+    section[id^="view-"] > header #clock-chip {
+        color:#fff !important;
+        border-color:rgba(255,255,255,.72) !important;
+        background:rgba(255,255,255,.16) !important;
+        box-shadow:none !important;
+    }
+    section[id^="view-"] > header .btn-primary { box-shadow:0 2px 10px rgba(0,0,0,.18); }
+    body:not(.light) section[id^="view-"] > header {
+        background-image: linear-gradient(180deg, rgba(8,12,26,.74), rgba(8,12,26,.40) 52%, rgba(8,12,26,.64)), url("hero-bg.jpg");
+    }
+    @media (max-width:640px){
+        section[id^="view-"] > header { min-height:150px; padding:24px 18px 16px; border-radius:14px; }
+    }
     /* 投递日历 */
     .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+    /* 日历与清单并排：宽屏左右两列，窄屏堆叠 */
+    .cal-cols { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
+    @media (min-width:1024px){
+        .cal-cols { grid-template-columns:1.15fr 1fr; gap:20px; }
+        .cal-cols .glass-panel { margin-bottom:0; }
+        .cal-cell { min-height:0; aspect-ratio:1/1.08; }
+        .cal-item { font-size:10.5px; padding:0 4px; }
+    }
     .cal-hd { text-align:center; font-size:12px; color:#6B665C; padding:4px 0; font-weight:600; }
     .cal-cell { min-height:88px; border-radius:10px; border:1px solid rgba(70,60,40,0.12); background:rgba(255,254,250,0.65); padding:5px 7px; display:flex; flex-direction:column; gap:3px; overflow:hidden; }
+    /* 窄屏日历紧凑化：缩小格高与间距，贴合标题栏，避免单元格内大片留白 */
+    @media (max-width: 640px){
+        .cal-cell { min-height:56px; padding:3px 4px; gap:2px; border-radius:8px; }
+        .cal-grid { gap:4px; }
+        .cal-hd { font-size:10px; padding:2px 0; }
+        .cal-day { font-size:11px; }
+        .cal-item { font-size:10px; padding:0 3px; border-radius:4px; line-height:1.35; }
+        .cal-more { font-size:10px; }
+        #cal-block > header { margin-bottom:12px; }
+        #cal-block .glass-panel { padding:12px; margin-bottom:12px; }
+    }
     .cal-cell.out { opacity:.35; background:rgba(255,254,250,0.3); }
     .cal-cell.today { border-color:#356B3F; box-shadow:0 0 0 1px #356B3F inset; }
     .cal-cell.has-dd { background:rgba(139,195,154,0.10); }
@@ -217,10 +279,10 @@
 </head>
 <body class="font-sans antialiased">
 
-<div class="lg:flex h-screen overflow-hidden">
+<div class="app-shell lg:flex h-screen overflow-hidden">
 
     <!-- ===== 侧边导航（桌面） ===== -->
-    <aside class="hidden lg:flex w-64 shrink-0 glass-panel flex-col border-r border-slate-700/50 relative z-10">
+    <aside class="sidebar hidden lg:flex w-64 shrink-0 glass-panel flex-col border-r border-slate-700/50 relative z-10">
         <div class="p-6 pb-4">
             <div class="flex items-center gap-2.5">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
@@ -262,12 +324,16 @@
                 <svg id="theme-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 <span id="theme-label">白天模式</span>
             </button>
+            <button id="btn-cloud" class="btn btn-ghost w-full !py-2 !text-xs" title="Gitee 云端同步：多设备数据互通">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.88-8.89 6 6 0 1 0-10.9 4.05A4 4 0 0 0 7 19h10.5z"/><path d="M12 11v6M9.5 13.5 12 16l2.5-2.5"/></svg>
+                <span id="cloud-label">云同步</span>
+            </button>
             <p class="text-[11px] text-slate-500 leading-relaxed pt-1">初始 41 条来自飞书表格「数据表」，编辑内容保存在本机浏览器。</p>
         </div>
     </aside>
 
     <!-- ===== 主内容区 ===== -->
-    <main class="flex-1 h-full overflow-y-auto relative">
+    <main class="main-area flex-1 h-full overflow-y-auto relative">
 
         <!-- 移动端顶部导航 -->
         <div class="lg:hidden sticky top-0 z-20 glass-panel border-b border-slate-700/50 px-4 py-2.5 flex items-center gap-2 overflow-x-auto">
@@ -283,6 +349,9 @@
             <button id="btn-add-m" class="btn btn-primary !px-3 !py-1.5 !text-[13px]">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增
             </button>
+            <button id="btn-cloud-m" class="nav-item !py-1.5 !px-2.5 !text-[13px] shrink-0" title="Gitee 云端同步" aria-label="云同步">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.88-8.89 6 6 0 1 0-10.9 4.05A4 4 0 0 0 7 19h10.5z"/><path d="M12 11v6M9.5 13.5 12 16l2.5-2.5"/></svg>云
+            </button>
         </div>
 
         <div class="absolute top-0 right-0 w-96 h-96 bg-blue-900/20 rounded-full blur-3xl -z-10 pointer-events-none"></div>
@@ -293,7 +362,7 @@
             <section id="view-overview">
                 <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
                     <div>
-                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">投递追踪仪表盘</h2>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">投递追踪仪表盘 <span class="ver-chip" id="ver-chip">v13</span></h2>
                     </div>
                     <div class="flex items-center gap-2.5 flex-wrap">
                         <span class="chip num" id="clock-chip"></span>
@@ -335,6 +404,35 @@
                     </div>
                 </div>
 
+                <!-- 投递日历（并入总览页，与侧边栏同屏） -->
+                <div id="cal-block" class="glass-panel rounded-2xl p-4 md:p-5 mb-7">
+                    <header class="mb-4 flex flex-wrap justify-between items-end gap-3">
+                        <div>
+                            <h3 class="text-base md:text-lg font-bold tracking-tight">投递日历 <span class="ver-chip">v13</span></h3>
+                            <p class="text-xs text-slate-500 mt-1.5">按「截止日期」汇总，点击公司可补全或修改信息</p>
+                        </div>
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <button id="btn-cal-prev" class="icon-btn !px-2 !py-1" title="上一月" aria-label="上一月">
+                                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                            </button>
+                            <span id="cal-month-label" class="num text-sm font-bold min-w-[96px] text-center"></span>
+                            <button id="btn-cal-next" class="icon-btn !px-2 !py-1" title="下一月" aria-label="下一月">
+                                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                            </button>
+                            <button id="btn-cal-today" class="btn btn-ghost !py-1.5 !text-xs">回到本月</button>
+                        </div>
+                    </header>
+                    <div class="cal-cols">
+                        <div class="glass-panel rounded-2xl p-4 md:p-5 mb-5">
+                            <div class="cal-grid" id="cal-grid"></div>
+                        </div>
+                        <div class="glass-panel rounded-2xl p-4 md:p-5">
+                            <h4 class="text-sm font-semibold mb-3">截止日期清单</h4>
+                            <div id="cal-list" class="space-y-2"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 投递明细表 -->
                 <div class="glass-panel rounded-2xl overflow-hidden">
                     <div class="p-4 md:p-5 pb-3 flex flex-wrap gap-3 items-center border-b border-slate-700/50">
@@ -348,8 +446,10 @@
                             <option value="全部">全部状态</option>
                             <option value="进行中">进行中（投递→面试）</option>
                             <option value="已投递">已投递</option>
+                            <option value="待笔试">待笔试</option>
                             <option value="已笔试">已笔试</option>
                             <option value="已一面">已一面</option>
+                            <option value="已二面">已二面</option>
                             <option value="面试中">面试中</option>
                             <option value="已拿Offer">已拿 Offer</option>
                             <option value="面试推进">面试推进（一面+面试中）</option>
@@ -509,7 +609,7 @@
             <div class="field">
                 <label>状态</label>
                 <select name="status" class="ctrl w-full px-3 py-2.5">
-                    <option>已投递</option><option>已笔试</option><option>已一面</option>
+                    <option>已投递</option><option>待笔试</option><option>已笔试</option><option>已一面</option><option>已二面</option>
                     <option>面试中</option><option>已拿Offer</option><option>已终止</option>
                 </select>
             </div>
@@ -557,32 +657,6 @@
     </div>
 </div>
 
-<!-- ===== 视图：投递日历 ===== -->
-            <section id="view-calendar" class="hidden-v">
-                <header class="mb-6 flex flex-wrap justify-between items-end gap-3">
-                    <div>
-                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">投递日历</h2>
-                        <p class="text-sm text-slate-500 mt-1.5">按「截止日期」汇总，点击公司可补全或修改信息</p>
-                    </div>
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                        <button id="btn-cal-prev" class="icon-btn !px-2 !py-1" title="上一月" aria-label="上一月">
-                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                        </button>
-                        <span id="cal-month-label" class="num text-sm font-bold min-w-[96px] text-center"></span>
-                        <button id="btn-cal-next" class="icon-btn !px-2 !py-1" title="下一月" aria-label="下一月">
-                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-                        </button>
-                        <button id="btn-cal-today" class="btn btn-ghost !py-1.5 !text-xs">回到本月</button>
-                    </div>
-                </header>
-                <div class="glass-panel rounded-2xl p-4 md:p-5 mb-5">
-                    <div class="cal-grid" id="cal-grid"></div>
-                </div>
-                <div class="glass-panel rounded-2xl p-4 md:p-5">
-                    <h3 class="text-sm font-semibold mb-3">截止日期清单</h3>
-                    <div id="cal-list" class="space-y-2"></div>
-                </div>
-            </section>
 
 <!-- ===== 题库题目弹窗 ===== -->
 <div id="qmodal" class="modal-overlay hidden-v">
@@ -680,6 +754,33 @@
     </div>
 </div>
 
+<!-- ===== Gitee 云同步弹窗 ===== -->
+<div id="cloudmodal" class="modal-overlay hidden-v">
+    <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="cloudmodal-title">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="cloudmodal-title" class="text-lg font-bold">Gitee 云同步</h3>
+            <button id="cloudmodal-close" class="icon-btn !px-2.5" aria-label="关闭">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <p class="text-[11px] text-slate-500 -mt-1 mb-4">数据以 <b class="num">data.json</b> 存于仓库 <b class="num">jiatong_vicky/job-dashboard</b>：各设备打开自动拉取最新，本地改动自动推送。令牌只保存在本机浏览器，不会随页面分发。</p>
+        <div class="field">
+            <label>Gitee 私人令牌（Personal Access Token）</label>
+            <input id="cloud-token" type="password" class="ctrl w-full px-3 py-2.5" placeholder="粘贴 gitee.com 个人设置 → 私人令牌，需勾选 projects 权限">
+        </div>
+        <label class="flex items-center gap-2 mt-3 text-sm cursor-pointer select-none">
+            <input id="cloud-auto" type="checkbox" class="accent-emerald-500 w-4 h-4"> 自动同步（打开页面自动拉取，改动后自动推送）
+        </label>
+        <p id="cloud-status" class="text-xs text-slate-500 mt-3 leading-relaxed">尚未配置令牌。</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+            <button type="button" id="cloud-save" class="btn btn-primary">保存设置</button>
+            <button type="button" id="cloud-pull" class="btn btn-ghost">立即拉取</button>
+            <button type="button" id="cloud-push" class="btn btn-ghost">立即推送</button>
+            <button type="button" id="cloud-close" class="btn btn-ghost ml-auto">关闭</button>
+        </div>
+    </div>
+</div>
+
 <!-- ===== 飞书 CSV 导入弹窗 ===== -->
 <div id="syncmodal" class="modal-overlay hidden-v">
     <div class="modal-panel p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="syncmodal-title">
@@ -718,7 +819,8 @@
             const raw = localStorage.getItem(STORE_KEY);
             if (raw) {
                 const d = JSON.parse(raw);
-                if (Array.isArray(d)) return d;
+                // 仅当数组非空才采用；空数组（曾被误清空/换环境）也回填初始 41 条，避免页面空白
+                if (Array.isArray(d) && d.length) return d;
             }
         } catch (e) { /* 损坏则回退种子数据 */ }
         const seed = JSON.parse(JSON.stringify(SEED_DATA));
@@ -727,6 +829,7 @@
     }
     function saveData() {
         try { localStorage.setItem(STORE_KEY, JSON.stringify(APPLICATIONS)); } catch (e) { toast("保存失败：浏览器存储不可用"); }
+        schedulePush();
     }
     let APPLICATIONS = loadData();
 
@@ -758,20 +861,20 @@
     }
     restoreMissingApply();
 
-    const STATUS_ORDER = ["已投递", "已笔试", "已一面", "面试中", "已拿Offer", "已终止"];
+    const STATUS_ORDER = ["已投递", "待笔试", "已笔试", "已一面", "已二面", "面试中", "已拿Offer", "已终止"];
     const STATUS_CLS = {
-        "已投递": "st-blue", "已笔试": "st-amber", "已一面": "st-cyan", "面试中": "st-violet", "已拿Offer": "st-emerald", "已终止": "st-slate"
+        "已投递": "st-blue", "待笔试": "st-amber", "已笔试": "st-amber", "已一面": "st-cyan", "已二面": "st-cyan", "面试中": "st-violet", "已拿Offer": "st-emerald", "已终止": "st-slate"
     };
     let KPI_HEX = { "全部": "#AFA794", "进行中": "#5B7E6C", "已笔试": "#356B3F", "面试推进": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A", "待投递": "#7A8C4E" };
     let STATUS_HEX = {
-        "已投递": "#7FB3A0", "已笔试": "#A8C686", "已一面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8"
+        "已投递": "#7FB3A0", "待笔试": "#A8C686", "已笔试": "#A8C686", "已一面": "#5FC7B4", "已二面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8"
     };
     const FILTER_MAP = {
         "全部": null,
-        "进行中": ["已投递", "已笔试", "已一面", "面试中"],
-        "已投递": ["已投递"], "已笔试": ["已笔试"], "已一面": ["已一面"], "面试中": ["面试中"],
+        "进行中": ["已投递", "待笔试", "已笔试", "已一面", "已二面", "面试中"],
+        "已投递": ["已投递"], "待笔试": ["待笔试"], "已笔试": ["已笔试", "待笔试"], "已一面": ["已一面"], "已二面": ["已二面"], "面试中": ["面试中"],
         "已拿Offer": ["已拿Offer"],
-        "面试推进": ["已一面", "面试中"],
+        "面试推进": ["已一面", "已二面", "面试中"],
         "已终止": ["已终止"]
     };
 
@@ -821,8 +924,8 @@
         return [
             { key: "全部", label: "全部投递", value: total, color: KPI_HEX["全部"] },
             { key: "进行中", label: "进行中", value: active, color: KPI_HEX["进行中"] },
-            { key: "已笔试", label: "笔试 / 测评", value: by["已笔试"] || 0, color: KPI_HEX["已笔试"] },
-            { key: "面试推进", label: "面试推进", value: (by["已一面"] || 0) + (by["面试中"] || 0), color: KPI_HEX["面试推进"] },
+            { key: "已笔试", label: "笔试 / 测评", value: (by["已笔试"] || 0) + (by["待笔试"] || 0), color: KPI_HEX["已笔试"] },
+            { key: "面试推进", label: "面试推进", value: (by["已一面"] || 0) + (by["已二面"] || 0) + (by["面试中"] || 0), color: KPI_HEX["面试推进"] },
             { key: "已拿Offer", label: "已拿 Offer", value: by["已拿Offer"] || 0, color: KPI_HEX["已拿Offer"] },
             { key: "已终止", label: "已终止", value: by["已终止"] || 0, color: KPI_HEX["已终止"] },
             { key: "待投递", label: "待投递", value: PENDING.items.length, color: KPI_HEX["待投递"] }
@@ -855,11 +958,11 @@
         if (light) {
             CHT = { axis: "#6B665C", label: "#2A2723", sub: "#57534C", grid: "rgba(70,60,40,.1)", line: "rgba(70,60,40,.22)", tipBg: "#FDFBF5", tipBorder: "rgba(70,60,40,.2)", border: "#E9E4D8", bar: "#356B3F", barOther: "#9A958A", heat: ["#EFEBDF", "#B9C8B2", "#6E8F7E", "#356B3F"] };
             KPI_HEX = { "全部": "#C9C2B2", "进行中": "#5B7E6C", "已笔试": "#356B3F", "面试推进": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A", "待投递": "#7A8C4E" };
-            STATUS_HEX = { "已投递": "#5B7E6C", "已笔试": "#356B3F", "已一面": "#7A8C4E", "面试中": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A" };
+            STATUS_HEX = { "已投递": "#5B7E6C", "待笔试": "#356B3F", "已笔试": "#356B3F", "已一面": "#7A8C4E", "已二面": "#7A8C4E", "面试中": "#2F7D6E", "已拿Offer": "#2E7D4F", "已终止": "#9A958A" };
         } else {
             CHT = { axis: "#94a3b8", label: "#e2e8f0", sub: "#cbd5e1", grid: "rgba(148,163,184,.12)", line: "rgba(148,163,184,.3)", tipBg: "#1e293b", tipBorder: "rgba(148,163,184,.3)", border: "#0f172a", bar: "#4CA05F", barOther: "#7c8aa0", heat: ["#0E1F2E", "#1F4630", "#356B3F", "#5B8F68"] };
             KPI_HEX = { "全部": "#A5B4C5", "进行中": "#7FB3A0", "已笔试": "#A8C686", "面试推进": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8", "待投递": "#5FC7B4" };
-            STATUS_HEX = { "已投递": "#7FB3A0", "已笔试": "#A8C686", "已一面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8" };
+            STATUS_HEX = { "已投递": "#7FB3A0", "待笔试": "#A8C686", "已笔试": "#A8C686", "已一面": "#5FC7B4", "已二面": "#5FC7B4", "面试中": "#9BC56E", "已拿Offer": "#4BE08A", "已终止": "#8FA0B8" };
         }
         TIP.backgroundColor = CHT.tipBg;
         TIP.borderColor = CHT.tipBorder;
@@ -1202,12 +1305,13 @@ let charts = [];
         }
         const withoutApp = APPLICATIONS.filter(a => !a.deadline).sort((x, y) => (x.company < y.company ? -1 : x.company > y.company ? 1 : 0));
         if (withoutApp.length) {
-            html += '<div class="text-xs font-semibold text-slate-400 pt-4 pb-2">投递总览 · 未填截止日期（' + withoutApp.length + "）</div>";
+            html += '<details class="cal-details"><summary>投递总览 · 未填截止日期（' + withoutApp.length + "）</summary><div class=\"pt-2\">";
             html += withoutApp.map(a => calRowHTML("未填", { src: "app", id: a.id, name: a.company, role: a.role }, '<span class="cal-badge gray">去填写</span>')).join("");
+            html += "</div></details>";
         }
         const withoutPending = PENDING.items.filter(p => !p.deadline).sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
         if (withoutPending.length) {
-            html += '<details open class="cal-details"><summary>待投递池 · 未填截止日期（' + withoutPending.length + "）</summary><div class=\"pt-2\">";
+            html += '<details class="cal-details"><summary>待投递池 · 未填截止日期（' + withoutPending.length + "）</summary><div class=\"pt-2\">";
             html += withoutPending.map(p => calRowHTML("未填", { src: "pending", id: p.id, name: p.name, role: p.role }, '<span class="cal-badge gray">去填写</span>')).join("");
             html += "</div></details>";
         }
@@ -1224,19 +1328,19 @@ let charts = [];
             badgeHtml + "</button>";
     }
 
-    // ===== 视图切换 =====
+    // ===== 视图切换（容错版：任一视图节点缺失时跳过，避免整页中断） =====
+    function viewEl(id) { const el = document.getElementById(id); return el ? el : { classList: { toggle: function () {} } }; }
     function switchView(view) {
+        if (view === "calendar") { switchView("overview"); const cb = document.getElementById("cal-block"); if (cb) cb.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
         state.view = view;
         document.querySelectorAll(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.view === view));
-        $("view-overview").classList.toggle("hidden-v", view !== "overview");
-        $("view-timeline").classList.toggle("hidden-v", view !== "timeline");
-        $("view-interview").classList.toggle("hidden-v", view !== "interview");
-        $("view-pending").classList.toggle("hidden-v", view !== "pending");
-        $("view-calendar").classList.toggle("hidden-v", view !== "calendar");
+        viewEl("view-overview").classList.toggle("hidden-v", view !== "overview");
+        viewEl("view-timeline").classList.toggle("hidden-v", view !== "timeline");
+        viewEl("view-interview").classList.toggle("hidden-v", view !== "interview");
+        viewEl("view-pending").classList.toggle("hidden-v", view !== "pending");
         if (view === "interview") renderInterviewAll();
         if (view === "pending") renderPending();
-        if (view === "calendar") renderCalendar();
-        if (view === "overview") renderKpis();
+        if (view === "overview") { renderKpis(); renderCalendar(); }
         charts.forEach(c => c.resize());
     }
 
@@ -1265,7 +1369,7 @@ let charts = [];
             if (mode === "update") {
                 // 更新进度：默认把状态推进一档，时间线聚焦在末尾
                 const st = a.status;
-                const next = st === "已投递" ? "已笔试" : st === "已笔试" ? "已一面" : st === "已一面" ? "面试中" : st === "面试中" ? "已拿Offer" : st;
+                const next = st === "已投递" ? "待笔试" : st === "待笔试" ? "已笔试" : st === "已笔试" ? "已一面" : st === "已一面" ? "已二面" : st === "已二面" ? "面试中" : st === "面试中" ? "已拿Offer" : st;
                 form.status.value = next;
                 if (!form.latestDate.value) form.latestDate.value = today();
             }
@@ -1586,7 +1690,7 @@ let charts = [];
         try { const raw = localStorage.getItem(PENDING_KEY); if (raw) { const d = JSON.parse(raw); if (d && Array.isArray(d.items)) PENDING = d; } } catch (e) {}
         if (!PENDING || !Array.isArray(PENDING.items)) PENDING = { version: 1, items: [] };
     }
-    function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(PENDING)); } catch (e) {} }
+    function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(PENDING)); } catch (e) {} schedulePush(); }
     function fmtUpd(d) {
         if (!d) return "—";
         const t = new Date(d);
@@ -1746,7 +1850,8 @@ let charts = [];
         if (marked.length) { try { localStorage.setItem(PENDING_SEED2_KEY, JSON.stringify(marked)); } catch (e) {} }
         if (added.length) {
             savePending();
-            toast("已加入待投递：" + added.join("、"));
+            // 避免超长名单覆盖页面：仅提示数量，名单可在「待投递」页查看
+            toast("已加入待投递 " + added.length + " 家，可在「待投递」页查看");
         }
     }
     const pmodal = $("pmodal");
@@ -1880,7 +1985,7 @@ let charts = [];
         if (rows.length < 2) { toast("CSV 内容为空或格式不对"); return; }
         const h = rows[0].map(x => x.trim());
         const idx = n => h.indexOf(n);
-        const STATUS_OK = ["已投递", "已笔试", "已一面", "面试中", "已拿Offer", "已终止"];
+        const STATUS_OK = ["已投递", "待笔试", "已笔试", "已一面", "已二面", "面试中", "已拿Offer", "已终止"];
         const out = [];
         for (let i = 1; i < rows.length; i++) {
             const r = rows[i];
@@ -1985,6 +2090,20 @@ let charts = [];
         $("btn-reset").addEventListener("click", resetData);
         $("btn-theme").addEventListener("click", () => setTheme(document.body.classList.contains("light") ? "dark" : "light"));
         $("btn-theme-m").addEventListener("click", () => setTheme(document.body.classList.contains("light") ? "dark" : "light"));
+        $("btn-cloud").addEventListener("click", cloudOpen);
+        $("btn-cloud-m").addEventListener("click", cloudOpen);
+        $("cloudmodal-close").addEventListener("click", closeCloudModal);
+        $("cloud-close").addEventListener("click", closeCloudModal);
+        cloudmodal.addEventListener("click", e => { if (e.target === cloudmodal) closeCloudModal(); });
+        $("cloud-save").addEventListener("click", () => {
+            localStorage.setItem(GITEE_TOKEN_KEY, $("cloud-token").value.trim());
+            localStorage.setItem(GITEE_AUTO_KEY, $("cloud-auto").checked ? "1" : "0");
+            toast("已保存云同步设置");
+            refreshCloudStatus();
+            cloudPull();
+        });
+        $("cloud-pull").addEventListener("click", cloudPull);
+        $("cloud-push").addEventListener("click", cloudPush);
         $("btn-heat-prev").addEventListener("click", () => { if (heatMonthIdx > 0) { heatMonthIdx--; buildHeat(); } });
         $("btn-heat-next").addEventListener("click", () => { if (heatMonthIdx < HEAT_MONTHS.length - 1) { heatMonthIdx++; buildHeat(); } });
         $("btn-cal-prev").addEventListener("click", () => calShift(-1));
@@ -1999,6 +2118,7 @@ let charts = [];
             if (!qmodal.classList.contains("hidden-v")) closeQModal();
             if (!pmodal.classList.contains("hidden-v")) closePModal();
             if (!syncmodal.classList.contains("hidden-v")) closeSyncModal();
+            if (!cloudmodal.classList.contains("hidden-v")) closeCloudModal();
         });
         $("btn-pd-add").addEventListener("click", addPending);
         $("pd-input").addEventListener("keydown", e => { if (e.key === "Enter") addPending(); });
@@ -2019,6 +2139,94 @@ let charts = [];
             if (b) jumpTo(b.dataset.jump);
         }));
         window.addEventListener("resize", () => charts.forEach(c => c.resize()));
+    }
+
+    // ===== Gitee 云同步（多端数据互通） =====
+    const GITEE_OWNER = "jiatong_vicky";
+    const GITEE_REPO = "job-dashboard";
+    const GITEE_FILE = "data.json";
+    const GITEE_TOKEN_KEY = "gitee-token";
+    const GITEE_AUTO_KEY = "gitee-auto";
+    const GITEE_MTIME_KEY = "dashboard-local-mtime";
+    let cloudBusy = false;
+    let cloudTimer = null;
+    const cloudmodal = $("cloudmodal");
+    function cloudToken() { try { return localStorage.getItem(GITEE_TOKEN_KEY) || ""; } catch (e) { return ""; } }
+    function cloudAuto() { try { return localStorage.getItem(GITEE_AUTO_KEY) !== "0"; } catch (e) { return true; } }
+    function b64e(s) { return btoa(unescape(encodeURIComponent(s))); }
+    function b64d(s) { return decodeURIComponent(escape(atob(s))); }
+    function cloudMtime() { try { return localStorage.getItem(GITEE_MTIME_KEY) || ""; } catch (e) { return ""; } }
+    function setCloudMtime(t) { try { localStorage.setItem(GITEE_MTIME_KEY, t); } catch (e) {} }
+    function cloudPayload() {
+        loadPending();
+        return JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), applications: APPLICATIONS, pending: PENDING });
+    }
+    function cloudStatus(msg) { const el = $("cloud-status"); if (el) el.textContent = msg; }
+    function cloudOpen() {
+        if (cloudToken()) $("cloud-token").value = cloudToken();
+        $("cloud-auto").checked = cloudAuto();
+        cloudmodal.classList.remove("hidden-v");
+        document.body.style.overflow = "hidden";
+        refreshCloudStatus();
+    }
+    function closeCloudModal() { cloudmodal.classList.add("hidden-v"); document.body.style.overflow = ""; }
+    async function refreshCloudStatus() {
+        const el = $("cloud-status");
+        if (!el) return;
+        if (!cloudToken()) { el.textContent = "尚未配置令牌：在 gitee.com 个人设置 → 私人令牌 创建后粘贴保存（勾选 projects 权限）。"; return; }
+        try {
+            const r = await fetch("https://gitee.com/api/v5/repos/" + GITEE_OWNER + "/" + GITEE_REPO + "/contents/" + GITEE_FILE + "?access_token=" + encodeURIComponent(cloudToken()), { headers: { "Accept": "application/json" } });
+            if (r.status === 404) { el.textContent = "云端还没有数据文件，改动后会自动创建。"; return; }
+            if (!r.ok) { el.textContent = "拉取失败（" + r.status + "）：检查令牌权限或仓库地址。"; return; }
+            const d = await r.json();
+            const obj = JSON.parse(b64d(d.content));
+            el.textContent = "云端已有数据 · 更新于 " + String(obj.updatedAt || "?").slice(0, 16).replace("T", " ");
+        } catch (e) { el.textContent = "连接云端失败：" + e.message; }
+    }
+    async function cloudPull() {
+        const token = cloudToken();
+        if (!token || cloudBusy) return;
+        cloudBusy = true;
+        try {
+            const r = await fetch("https://gitee.com/api/v5/repos/" + GITEE_OWNER + "/" + GITEE_REPO + "/contents/" + GITEE_FILE + "?access_token=" + encodeURIComponent(token), { headers: { "Accept": "application/json" } });
+            if (r.status === 404) return;
+            if (!r.ok) { cloudStatus("拉取失败（" + r.status + "）"); return; }
+            const d = await r.json();
+            const obj = JSON.parse(b64d(d.content));
+            if (!obj || !obj.updatedAt || !Array.isArray(obj.applications)) return;
+            const localM = cloudMtime();
+            if (localM && localM > obj.updatedAt) return;
+            APPLICATIONS = obj.applications;
+            PENDING = obj.pending && obj.pending.items ? obj.pending : { version: 1, items: [] };
+            saveData(); savePending();
+            setCloudMtime(obj.updatedAt);
+            renderKpis(); renderCharts(); renderTable(); renderTimeline(); renderPending();
+            if (state.view === "calendar") renderCalendar();
+            toast("已同步云端数据");
+        } catch (e) { cloudStatus("连接云端失败：" + e.message); }
+        finally { cloudBusy = false; }
+    }
+    async function cloudPush() {
+        const token = cloudToken();
+        if (!token || cloudBusy) return;
+        cloudBusy = true;
+        try {
+            const url = "https://gitee.com/api/v5/repos/" + GITEE_OWNER + "/" + GITEE_REPO + "/contents/" + GITEE_FILE;
+            let sha = "";
+            const g = await fetch(url + "?access_token=" + encodeURIComponent(token), { headers: { "Accept": "application/json" } });
+            if (g.ok) { const d = await g.json(); if (d && d.sha) sha = d.sha; }
+            const body = { access_token: token, content: b64e(cloudPayload()), message: "dashboard sync " + new Date().toISOString() };
+            if (sha) body.sha = sha;
+            const r = await fetch(url, { method: sha ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(body) });
+            if (r.ok) { setCloudMtime(new Date().toISOString()); cloudStatus("推送成功 · 已同步到云端"); }
+            else { const err = await r.json().catch(() => ({})); cloudStatus("推送失败（" + r.status + "）：" + (err.message || "检查令牌与仓库权限")); }
+        } catch (e) { cloudStatus("连接云端失败：" + e.message); }
+        finally { cloudBusy = false; }
+    }
+    function schedulePush() {
+        if (!cloudToken() || !cloudAuto() || cloudBusy) return;
+        clearTimeout(cloudTimer);
+        cloudTimer = setTimeout(cloudPush, 1500);
     }
 
     // ===== 当前日期时间（实时刷新） =====
@@ -2047,9 +2255,23 @@ let charts = [];
     renderInterviewAll();
     seedPendingItems();
     renderKpis();
+    renderCalendar();
     renderPending();
     bind();
+    window.addEventListener("error", ev => {
+        const bar = document.getElementById("diag-bar");
+        if (bar) { bar.textContent = "页面出错：" + (ev.message || String(ev.error || "")) + (ev.filename ? " @" + ev.filename.split("/").pop() + ":" + ev.lineno : ""); bar.style.display = "block"; }
+    });
+    if (cloudAuto()) cloudPull();
+    if (location.protocol === "https:" || location.protocol === "http:") {
+        const ml = document.createElement("link");
+        ml.rel = "manifest"; ml.href = "manifest.webmanifest";
+        document.head.appendChild(ml);
+        if ("serviceWorker" in navigator && location.protocol === "https:") {
+            window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+        }
+    }
 </script>
+<div id="diag-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:99;background:#7f1d1d;color:#fff;font:12px/1.5 ui-monospace,monospace;padding:8px 12px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.3)"></div>
 </body>
 </html>
-
