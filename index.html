@@ -581,6 +581,14 @@
                     </div>
                 </div>
 
+                <div class="pending-search-container">
+                    <div class="pending-search-wrapper">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                        <input id="pending-search-input" type="search" placeholder="搜索公司、岗位或地点..." autocomplete="off" aria-label="搜索待投递项目">
+                        <button id="clear-pending-search" type="button" class="pending-clear" aria-label="清除搜索" hidden>×</button>
+                    </div>
+                    <span id="pending-search-count" class="text-xs text-slate-500" aria-live="polite"></span>
+                </div>
                 <div id="pd-list" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
             </section>
 
@@ -1710,15 +1718,40 @@ let charts = [];
         if (days === 0) return { txt: "今天截止", cls: "dd-soon" };
         return { txt: "截止 " + md, cls: "dd-ok" };
     }
+    function filterPendingDeliveries() {
+        const input = $("pending-search-input");
+        const clear = $("clear-pending-search");
+        if (clear) clear.hidden = !input || !input.value;
+        renderPending();
+    }
+    function clearPendingSearch() {
+        const input = $("pending-search-input");
+        if (!input) return;
+        input.value = "";
+        filterPendingDeliveries();
+        input.focus();
+    }
+    $("pending-search-input").addEventListener("input", filterPendingDeliveries);
+    $("clear-pending-search").addEventListener("click", clearPendingSearch);
     function renderPending() {
         loadPending();
         const list = $("pd-list");
         $("pd-stats").textContent = PENDING.items.length + " 项";
+        const query = ($("pending-search-input")?.value || "").trim().toLocaleLowerCase();
+        const matching = PENDING.items.filter(it => [it.name, it.role, it.base].some(v => String(v || "").toLocaleLowerCase().includes(query)));
+        const countEl = $("pending-search-count");
+        if (countEl) countEl.textContent = query ? `找到 ${matching.length} / ${PENDING.items.length} 项` : "";
+        const clearEl = $("clear-pending-search");
+        if (clearEl) clearEl.hidden = !$("pending-search-input").value;
         if (!PENDING.items.length) {
             list.innerHTML = '<div class="glass-panel rounded-2xl p-10 text-center text-slate-500">还没有待投递项，先在上面输入一个名字吧</div>';
             return;
         }
-        const items = [...PENDING.items].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+        if (!matching.length) {
+            list.innerHTML = '<div class="pending-empty">未找到匹配的待投递项目</div>';
+            return;
+        }
+        const items = [...matching].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
         list.innerHTML = items.map(it => {
             const cls = PENDING_CLS[it.status] || "st-blue";
             const sub = [(it.role || "").trim() || "岗位待补充", (it.base || "").trim()].filter(Boolean).join(" · ");
